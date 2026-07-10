@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="amthal_portal_loading">Loading…</string>
+    <string name="amthal_portal_retry">Retry</string>
+    <string name="amthal_portal_error_offline_title">No internet connection</string>
+    <string name="amthal_portal_error_offline_body">Check your connection and try again.</string>
+    <string name="amthal_portal_error_load_title">Something went wrong</string>
+    <string name="amthal_portal_error_load_body">The portal could not be loaded. Please try again.</string>
+    <string name="amthal_portal_error_version_title">Update required</string>
+    <string name="amthal_portal_error_version_body">This version of the app is no longer compatible with the portal. Please update the app.</string>
+    <string name="amthal_portal_error_auth_title">Session expired</string>
+    <string name="amthal_portal_error_auth_body">Your session has expired. Please sign in again to continue.</string>
+    <string name="amthal_portal_file_chooser_title">Choose a file</string>
+</resources>

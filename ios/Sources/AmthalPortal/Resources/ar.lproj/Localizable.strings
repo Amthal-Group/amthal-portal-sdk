@@ -1,0 +1,25 @@
+/* Offline interstitial */
+"error.offline.title" = "لا يوجد اتصال بالإنترنت";
+"error.offline.message" = "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.";
+
+/* Load failed interstitial (also used for httpError / manifestFailed / bridgeTimeout / webProcessTerminated) */
+"error.loadFailed.title" = "حدث خطأ ما";
+"error.loadFailed.message" = "تعذّر تحميل البوابة. يرجى المحاولة مرة أخرى.";
+
+/* Version incompatible interstitial */
+"error.versionIncompatible.title" = "التحديث مطلوب";
+"error.versionIncompatible.message" = "هذا الإصدار من التطبيق غير متوافق مع البوابة. يرجى تحديث التطبيق والمحاولة مرة أخرى.";
+
+/* Session expired waiting overlay */
+"sessionExpired.title" = "انتهت الجلسة";
+"sessionExpired.message" = "جارٍ تجديد الجلسة…";
+
+/* Actions */
+"action.retry" = "إعادة المحاولة";
+"action.close" = "إغلاق";
+
+/* Discard-changes confirmation (dirty dismiss guard) */
+"discard.title" = "تجاهل التغييرات؟";
+"discard.message" = "لديك تغييرات غير محفوظة. هل أنت متأكد أنك تريد الإغلاق؟";
+"discard.confirm" = "تجاهل";
+"discard.cancel" = "إلغاء";

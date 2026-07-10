@@ -1,0 +1,43 @@
+{
+  "name": "@amthal-group/portal-react-native",
+  "version": "1.0.0",
+  "description": "Amthal Portal Embed SDK for React Native — pure-TypeScript wrapper over react-native-webview implementing Amthal Bridge Protocol v1",
+  "license": "MIT",
+  "author": "Amthal Group <dev@amthalgroup.com>",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "amthal",
+    "portal",
+    "react-native",
+    "webview",
+    "embed",
+    "form"
+  ],
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.72",
+    "react-native-webview": ">=13"
+  },
+  "dependencies": {
+    "@amthal-group/portal-bridge": "file:../../bridge"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-webview": "^13.12.4",
+    "typescript": "^5.6.0"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  }
+}

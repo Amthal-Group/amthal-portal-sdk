@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="amthal_portal_loading">جارٍ التحميل…</string>
+    <string name="amthal_portal_retry">إعادة المحاولة</string>
+    <string name="amthal_portal_error_offline_title">لا يوجد اتصال بالإنترنت</string>
+    <string name="amthal_portal_error_offline_body">تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="amthal_portal_error_load_title">حدث خطأ ما</string>
+    <string name="amthal_portal_error_load_body">تعذر تحميل البوابة. يرجى المحاولة مرة أخرى.</string>
+    <string name="amthal_portal_error_version_title">التحديث مطلوب</string>
+    <string name="amthal_portal_error_version_body">هذا الإصدار من التطبيق لم يعد متوافقًا مع البوابة. يرجى تحديث التطبيق.</string>
+    <string name="amthal_portal_error_auth_title">انتهت الجلسة</string>
+    <string name="amthal_portal_error_auth_body">انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى للمتابعة.</string>
+    <string name="amthal_portal_file_chooser_title">اختر ملفًا</string>
+</resources>

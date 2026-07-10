@@ -1,0 +1,15 @@
+{
+  "name": "@amthal-group/portal-sdk-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Amthal Portal Embed SDK — embed the Client Portal (and its form builder) in native and hybrid mobile apps",
+  "workspaces": [
+    "bridge",
+    "wrappers/react-native",
+    "wrappers/expo"
+  ],
+  "scripts": {
+    "build:bridge": "npm run build -w @amthal-group/portal-bridge",
+    "typecheck": "npm run typecheck -w @amthal-group/portal-bridge && npm run typecheck -w @amthal-group/portal-react-native && npm run typecheck -w @amthal-group/portal-expo"
+  }
+}

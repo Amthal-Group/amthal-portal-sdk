@@ -1,0 +1,20 @@
+{
+  "name": "@amthal-group/portal-bridge",
+  "version": "1.0.0",
+  "description": "Amthal Bridge Protocol v1 — types, web shim and mock host for embedding the Client Portal in native apps",
+  "license": "MIT",
+  "author": "Amthal Group <dev@amthalgroup.com>",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "src", "SPEC.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

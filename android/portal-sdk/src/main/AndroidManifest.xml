@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- INTERNET: load the remote portal. ACCESS_NETWORK_STATE: connectivity
+         watcher that auto-retries when the device comes back online.
+         NOTE: android.permission.CAMERA is deliberately NOT declared — camera
+         capture goes through MediaStore.ACTION_IMAGE_CAPTURE, which does not
+         require the permission (the camera app takes the picture). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application>
+
+        <activity
+            android:name="com.amthalgroup.portal.PortalFormActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.amthalportal.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/amthal_portal_file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

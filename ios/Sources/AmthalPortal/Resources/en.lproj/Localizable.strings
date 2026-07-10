@@ -1,0 +1,25 @@
+/* Offline interstitial */
+"error.offline.title" = "You're offline";
+"error.offline.message" = "Check your internet connection and try again.";
+
+/* Load failed interstitial (also used for httpError / manifestFailed / bridgeTimeout / webProcessTerminated) */
+"error.loadFailed.title" = "Something went wrong";
+"error.loadFailed.message" = "The portal could not be loaded. Please try again.";
+
+/* Version incompatible interstitial */
+"error.versionIncompatible.title" = "Update required";
+"error.versionIncompatible.message" = "This version of the app is not compatible with the portal. Please update the app and try again.";
+
+/* Session expired waiting overlay */
+"sessionExpired.title" = "Session expired";
+"sessionExpired.message" = "Renewing your session…";
+
+/* Actions */
+"action.retry" = "Retry";
+"action.close" = "Close";
+
+/* Discard-changes confirmation (dirty dismiss guard) */
+"discard.title" = "Discard changes?";
+"discard.message" = "You have unsaved changes. Are you sure you want to close?";
+"discard.confirm" = "Discard";
+"discard.cancel" = "Cancel";

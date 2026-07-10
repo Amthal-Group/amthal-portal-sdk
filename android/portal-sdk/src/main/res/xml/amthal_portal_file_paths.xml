@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Downloaded files presented via ACTION_VIEW. -->
+    <cache-path name="amthal_portal_downloads" path="amthal-portal/" />
+    <!-- Temp files for camera capture from the WebView file chooser. -->
+    <cache-path name="amthal_portal_camera" path="amthal-portal-camera/" />
+</paths>
