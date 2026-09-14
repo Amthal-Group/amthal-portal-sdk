@@ -2,7 +2,7 @@
   "name": "@amthal-group/portal-sdk-monorepo",
   "private": true,
   "version": "1.0.0",
-  "description": "Amthal Portal Embed SDK \u2014 embed the Client Portal (and its form builder) in native and hybrid mobile apps",
+  "description": "Amthal Portal Embed SDK — embed the Client Portal (and its form builder) in native and hybrid mobile apps",
   "workspaces": [
     "bridge",
     "wrappers/react-native",
@@ -17,7 +17,7 @@
     "type": "git",
     "url": "https://github.com/Amthal-Group/amthal-portal-sdk.git"
   },
-  "homepage": "https://github.com/Amthal-Group/amthal-portal-sdk#readme",
+  "homepage": "https://amthal.erpamthal.com/portal-sdk-docs/",
   "bugs": {
     "url": "https://github.com/Amthal-Group/amthal-portal-sdk/issues"
   },

@@ -14,6 +14,12 @@
 
 **Embed the Amthal Client Portal — including its dynamic form builder — inside any native or hybrid mobile app.**
 
+### 📖 [Read the documentation →](https://amthal.erpamthal.com/portal-sdk-docs/)
+
+Getting started, every configuration option, the full API reference for all four platforms,
+recipes, the bridge protocol, security and troubleshooting — searchable, in one place.
+
+[![Documentation](https://img.shields.io/badge/Docs-portal--sdk--docs-121E4C?style=flat-square&logo=readthedocs&logoColor=white)](https://amthal.erpamthal.com/portal-sdk-docs/)
 [![Bridge Protocol](https://img.shields.io/badge/Amthal%20Bridge-v1-00598A?style=flat-square)](bridge/SPEC.md)
 [![SDK](https://img.shields.io/badge/SDK-1.0.0-00598A?style=flat-square)](#-compatibility)
 [![iOS](https://img.shields.io/badge/iOS-15%2B-black?style=flat-square&logo=apple)](ios/)

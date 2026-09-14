@@ -50,7 +50,7 @@
     "type": "git",
     "url": "git+https://github.com/Amthal-Group/amthal-portal-sdk.git"
   },
-  "homepage": "https://github.com/Amthal-Group/amthal-portal-sdk#readme",
+  "homepage": "https://amthal.erpamthal.com/portal-sdk-docs/",
   "bugs": {
     "url": "https://github.com/Amthal-Group/amthal-portal-sdk/issues"
   }
