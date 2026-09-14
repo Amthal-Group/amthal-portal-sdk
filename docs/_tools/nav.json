@@ -1,0 +1,76 @@
+{
+  "site": {
+    "name": "Portal SDK",
+    "sdkVersion": "1.0.0",
+    "protocol": 1,
+    "url": "https://amthal.erpamthal.com/portal-sdk-docs",
+    "card": "assets/img/social-card.png",
+    "repo": "https://github.com/Amthal-Group/amthal-portal-sdk"
+  },
+  "pages": [
+    {
+      "file": "index.html",
+      "nav": "Overview",
+      "group": "Start",
+      "title": "Amthal Portal SDK — Overview",
+      "description": "Embed the Amthal Client Portal and its form engine inside your own iOS, Android, React Native or Expo app. Bridge protocol v1, SDK 1.0.0."
+    },
+    {
+      "file": "getting-started.html",
+      "nav": "Getting started",
+      "group": "Start",
+      "title": "Getting started — Amthal Portal SDK",
+      "description": "From nothing to a rendered Amthal form: what Amthal provisions for you, registry access, install per platform, the baseUrl rule, a minimal working snippet for React Native, Expo, iOS and Android, and how to verify it worked.\" /> <link rel=\"icon\" href=\"assets/img/amthal-logo.svg\" type=\"image/svg+xml\" /> <link rel=\"stylesheet\" href=\"assets/css/site.css\" /> </head> <body> <a class=\"skip-link\" href=\"#main"
+    },
+    {
+      "file": "configuration.html",
+      "nav": "Configuration",
+      "group": "Guides",
+      "title": "Configuration — Amthal Portal SDK",
+      "description": "Every configuration option of the Amthal Portal SDK on React Native, Expo, iOS and Android: types, defaults, validation, runtime updates, and what the SDK does and does not theme."
+    },
+    {
+      "file": "recipes.html",
+      "nav": "Recipes",
+      "group": "Guides",
+      "title": "Recipes — Amthal Portal SDK",
+      "description": "Working solutions for the things every Amthal Portal SDK integration ends up needing: anonymous and signed-in forms, reopening an application, handling a submission, refreshing an expired session, authenticated downloads, runtime locale and theme, unsaved-changes guards and form delegation."
+    },
+    {
+      "file": "security.html",
+      "nav": "Security",
+      "group": "Guides",
+      "title": "Security — Amthal Portal SDK",
+      "description": "The Amthal Portal SDK security model: where the bearer token travels, how main-frame navigation is confined to the portal origin, what release builds refuse, what destroy() clears, and the checklist to run before you ship."
+    },
+    {
+      "file": "api-reference.html",
+      "nav": "API reference",
+      "group": "Reference",
+      "title": "API reference — Amthal Portal SDK",
+      "description": "Complete verified API surface of the Amthal Portal SDK: React Native, Expo, iOS (Swift) and Android (Kotlin) — config, props, handles, delegates, listeners, request and auth shapes."
+    },
+    {
+      "file": "bridge-protocol.html",
+      "nav": "Bridge protocol",
+      "group": "Reference",
+      "title": "Bridge protocol v1 — Amthal Portal SDK",
+      "description": "How the native shell and the embedded Amthal Client Portal talk: the hello/init/ready handshake, every bridge message, the manifest version gate, timeouts and the security rules."
+    },
+    {
+      "file": "troubleshooting.html",
+      "nav": "Troubleshooting",
+      "group": "Reference",
+      "title": "Troubleshooting — Amthal Portal SDK",
+      "description": "Symptom, cause and fix for the failures integrators actually hit with the Amthal Portal SDK: manifest errors, the missing /portal prefix, Android emulator networking, dev certificates, registry 401s and every PortalErrorCode."
+    },
+    {
+      "file": "404.html",
+      "nav": "Not found",
+      "group": "Reference",
+      "listed": false,
+      "title": "Page not found — Amthal Portal SDK",
+      "description": "That documentation page does not exist. Start from the overview, or search."
+    }
+  ]
+}

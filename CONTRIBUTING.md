@@ -25,7 +25,7 @@ agreed a major version with you on the issue.
 | Path | What it is |
 |---|---|
 | `bridge/` | `@amthal-group/portal-bridge` — the protocol types, message builders and the mock host |
-| `ios/` | The Swift SDK (SwiftPM package, also consumed as an XCFramework) |
+| `ios/` | The Swift SDK (SwiftPM package, declared by the manifest at the repo root) |
 | `android/` | The Kotlin SDK (Gradle library module) |
 | `wrappers/react-native/` | `@amthal-group/portal-react-native` — inline WebView component |
 | `wrappers/expo/` | `@amthal-group/portal-expo` — native modal sheet via the iOS SDK |

@@ -91,7 +91,7 @@ The **Amthal Portal SDK** loads the Amthal **Client Portal** — a deployed Angu
 
 **What it deliberately does not do**
 
-- It does **not** render forms. Field types, layout, validation rules, option sources, drafts and submission all live in the portal (`@amthal-group/ng-form-builder`) and its backend. Deploy a new form and every app sees it immediately — no app release.
+- It does **not** render forms. Field types, layout, validation rules, option sources, drafts and submission all live in the portal's own form engine and its backend. Deploy a new form and every app sees it immediately — no app release.
 - It does **not** log anyone in. You obtain the token with your own login flow, against the same backend the portal uses.
 - It does **not** decide when to close. `formSubmitted` never auto-dismisses anything; your app owns the screen.
 
@@ -126,7 +126,7 @@ The **Amthal Portal SDK** loads the Amthal **Client Portal** — a deployed Angu
                                   ▼
 ┌───────────────────────────────────────────────────────────────────────────┐
 │  CLIENT PORTAL  (Angular, deployed by Amthal)                             │
-│  /embed/*  chromeless routes   ·   ng-form-builder   ·   /embed/manifest  │
+│  /embed/*  chromeless routes   ·   form engine   ·   /embed/manifest.json  │
 └─────────────────────────────────┬─────────────────────────────────────────┘
                                   ▼
                        Optimum Core API  (/Portal/Forms/*, /Portal/PublicForms/*)
@@ -1247,9 +1247,9 @@ The normative text is [`bridge/SPEC.md` §2.3](bridge/SPEC.md).
 | [`wrappers/react-native/`](wrappers/react-native/) | **`@amthal-group/portal-react-native`** — pure-TypeScript host over `react-native-webview` for **inline** embedding. No custom native code. |
 | [`wrappers/expo/`](wrappers/expo/) | **`@amthal-group/portal-expo`** — Expo module that presents the native iOS SDK in a device-native **sheet**. Apple platforms only. |
 | [`demos/react-native-example/`](demos/react-native-example/) | A runnable end-to-end React Native sample (login → home → embedded form). Set your portal origin in `src/config.ts`. |
-| [`docs/`](docs/) | [Integration guide](docs/integration-guide.md) — the cross-platform concepts in prose. |
+| [`docs/`](docs/) | The documentation site — the same material as this README, navigable. |
 
-The **portal side** of the embed runtime — the chromeless `/embed/*` routes, the platform bridge service, the auth-handoff service and `manifest.json` — lives in the separate **Client-Portal-Angular** repository. A portal deployment must serve embed mode for any of this to connect.
+The **portal side** of the embed runtime — the chromeless `/embed/*` routes, the platform bridge service, the auth-handoff service and `manifest.json` — ships with the Amthal Client Portal itself, which Amthal deploys and operates for your tenant. A portal deployment must serve embed mode for any of this to connect.
 
 ---
 

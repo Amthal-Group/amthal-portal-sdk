@@ -1,8 +1,7 @@
 /**
  * MOCK auth API.
  *
- * Replace both functions with calls to your real auth endpoint — for Amthal
- * apps that is the Customer-Vendor app's login, e.g.:
+ * Replace both functions with calls to your real auth endpoint, e.g.:
  *
  *   const res = await fetch(`${API_BASE_URL}/api/account/login`, {
  *     method: 'POST',

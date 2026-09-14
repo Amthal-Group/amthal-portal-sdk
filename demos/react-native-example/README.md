@@ -7,7 +7,7 @@ Flow: **Login** (mock) → **Home** (pick a demo form) → **Form** (`AmthalPort
 ## Point it at a real portal
 
 1. Edit [`src/config.ts`](src/config.ts) and set `PORTAL_BASE_URL` to your portal origin, e.g. `https://portal.yourcompany.com`. HTTPS is required; `http://localhost:4200` works for local dev (Android emulator: `http://10.0.2.2:4200`). The deployment must serve the embed routes — the SDK fetches `/embed/manifest.json` before loading anything.
-2. Replace the mock functions in [`src/api/auth.ts`](src/api/auth.ts) with your real login/refresh endpoints (for Amthal apps, the Customer-Vendor app's login). The token returned must be the bearer token the portal's auth service expects.
+2. Replace the mock functions in [`src/api/auth.ts`](src/api/auth.ts) with your real login/refresh endpoints. The token returned must be the bearer token the portal's auth service expects.
 3. Adjust the demo entries in [`src/screens/HomeScreen.tsx`](src/screens/HomeScreen.tsx) to product IDs that exist in your environment.
 
 ## Run it

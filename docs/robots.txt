@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://amthal.erpamthal.com/portal-sdk-docs/sitemap.xml

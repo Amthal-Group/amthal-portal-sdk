@@ -2,6 +2,20 @@
    Amthal Portal SDK — documentation site
    Shared stylesheet. No build step, no network: system fonts only, every
    asset reference relative. Used by every page of the site.
+
+   Contents
+     1. Design tokens            12. Tables
+     2. Base                     13. Code
+     3. Typography               14. Syntax highlighting
+     4. Page frame + layout      15. Platform tabs
+     5. Site header              16. Screenshots
+     6. Sidebar                  17. Anchor lists
+     7. Contents rail            18. Sequences
+     8. Hero                     19. Definition lists
+     9. Badges                   20. Footer
+    10. Cards                    21. Progressive enhancement (JS-built parts)
+    11. Callouts                 22. Utilities
+                                 23. Print
    ========================================================================= */
 
 /* -------------------------------------------------------------------------
@@ -33,14 +47,33 @@
   --danger-bg: #fdeef2;
   --danger-edge: #c0304f;
   --ok-edge: #1d7a4c;
+  --ok-bright: #5fd39a;       /* the same meaning as --ok-edge, on a dark ground */
+
+  /* Ink for the navy surfaces — header, footer, code blocks. These read the
+     same in both colour schemes because those surfaces are navy in both. */
+  --on-navy: rgba(255, 255, 255, .88);
+  --on-navy-dim: rgba(255, 255, 255, .62);        /* 6.9:1 on navy */
+  --on-navy-line: rgba(255, 255, 255, .22);       /* decorative separators only */
+  --on-navy-line-strong: rgba(255, 255, 255, .4); /* 3.6:1 — control borders */
+  --on-navy-fill: rgba(255, 255, 255, .08);
+  --on-navy-fill-strong: rgba(255, 255, 255, .18);
 
   /* Layout */
   --measure: 74ch;      /* readable prose width */
-  --wrap: 1120px;       /* page frame */
+  --wrap: 1120px;       /* page frame, legacy centred pages */
+  --frame: 1440px;      /* outer frame shared by header, layout and footer */
+  --gutter: clamp(1rem, 2.5vw, 2rem);
+  --content-pad: var(--gutter);   /* raised on .layout once the sidebar is in flow */
+  --content-top: 2.25rem;
+  --sidebar-w: 250px;
+  --toc-w: 220px;
+  --header-line: 3px;
+  --header-h: 60px;     /* includes --header-line; sticky offsets derive from it */
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 1px 2px rgba(18, 30, 76, .06), 0 8px 24px rgba(18, 30, 76, .07);
   --shadow-lift: 0 2px 4px rgba(18, 30, 76, .08), 0 16px 40px rgba(18, 30, 76, .12);
+  --scrim: rgba(18, 30, 76, .45);
 
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
           Arial, "Noto Sans", "Liberation Sans", sans-serif;
@@ -65,6 +98,7 @@
     --navy-500: #93a2c2;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
     --shadow-lift: 0 2px 4px rgba(0, 0, 0, .45), 0 16px 40px rgba(0, 0, 0, .5);
+    --scrim: rgba(3, 6, 18, .66);
   }
 }
 
@@ -77,7 +111,7 @@
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
-  scroll-padding-top: 5.5rem;
+  scroll-padding-top: calc(var(--header-h) + 1.25rem);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -159,7 +193,8 @@ li > ul, li > ol { margin-top: .4rem; }
 strong { font-weight: 650; }
 small { font-size: .875rem; }
 
-.lede {
+.lede,
+.hero__lede {
   font-size: clamp(1.08rem, 1rem + .45vw, 1.3rem);
   line-height: 1.55;
   color: var(--ink);
@@ -185,8 +220,19 @@ small { font-size: .875rem; }
   display: inline-block;
 }
 
+/* Closing note under a reference page's last section. */
+.footnote {
+  max-width: var(--measure);
+  margin-top: 3rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule);
+  font-size: .89rem;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
 /* -------------------------------------------------------------------------
-   4. Layout
+   4. Page frame + three-column layout
    ---------------------------------------------------------------------- */
 
 .wrap {
@@ -196,7 +242,7 @@ small { font-size: .875rem; }
   padding-inline: clamp(1rem, 4vw, 2.5rem);
 }
 
-main { display: block; padding-bottom: 4rem; }
+main { display: block; }
 
 section { margin-bottom: 1rem; }
 
@@ -208,22 +254,68 @@ section { margin-bottom: 1rem; }
   max-width: none;
 }
 
+/* The three columns: sidebar | content | contents rail. Single column first;
+   the columns are added as room appears. The rail is display:none below
+   1240px rather than wrapped, because a table of contents under the article
+   is noise the sidebar already carries. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: var(--frame);
+  margin-inline: auto;
+}
+
+.content {
+  min-width: 0;                 /* let wide children scroll, not stretch the track */
+  padding-inline: var(--content-pad);
+  padding-block: var(--content-top) 4rem;
+}
+
+/* index.html and configuration.html wrap their body in .wrap, the other pages
+   do not. Inside the content column the column itself owns the measure and the
+   padding, so the legacy wrapper must not add a second one. */
+.content .wrap {
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+@media (min-width: 1000px) {
+  .layout {
+    --content-pad: clamp(1.75rem, 3vw, 3rem);
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    padding-inline: var(--gutter);
+  }
+}
+
+@media (min-width: 1240px) {
+  .layout { grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--toc-w); }
+}
+
 /* -------------------------------------------------------------------------
-   5. Site header + nav
+   5. Site header
    ---------------------------------------------------------------------- */
 
 .site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   background: var(--navy);
   color: #ffffff;
-  border-bottom: 3px solid var(--accent);
+  border-bottom: var(--header-line) solid var(--accent);
 }
 
 .site-header__inner {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 1rem 2rem;
-  padding-block: .9rem;
+  gap: .75rem;
+  min-height: calc(var(--header-h) - var(--header-line));
+  max-width: var(--frame);
+  margin-inline: auto;
+  padding-block: .5rem;
+  padding-inline: var(--gutter);
 }
 
 .site-header__brand {
@@ -248,8 +340,156 @@ section { margin-bottom: 1rem; }
   color: rgba(255, 255, 255, .92);
   padding-left: .75rem;
   border-left: 1px solid rgba(255, 255, 255, .3);
+  white-space: nowrap;
 }
 
+/* Optional release/edition chip beside the title. */
+.site-header__product {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--on-navy-dim);
+  border: 1px solid var(--on-navy-line);
+  border-radius: 999px;
+  padding: .08rem .45rem;
+  white-space: nowrap;
+}
+
+/* Hamburger — drawn from one span plus its two pseudo-elements, and folded
+   into an X from the aria-expanded the JS already has to set. */
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--on-navy-line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+.nav-toggle:hover { background: var(--on-navy-fill-strong); }
+.nav-toggle:focus-visible { outline-color: #ffffff; }
+
+.nav-toggle__bars { position: relative; }
+.nav-toggle__bars,
+.nav-toggle__bars::before,
+.nav-toggle__bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform .2s ease, background-color .2s ease;
+}
+.nav-toggle__bars::before,
+.nav-toggle__bars::after { content: ""; position: absolute; left: 0; }
+.nav-toggle__bars::before { top: -6px; }
+.nav-toggle__bars::after { top: 6px; }
+
+.nav-toggle[aria-expanded="true"] .nav-toggle__bars { background: transparent; }
+.nav-toggle[aria-expanded="true"] .nav-toggle__bars::before { transform: translateY(6px) rotate(45deg); }
+.nav-toggle[aria-expanded="true"] .nav-toggle__bars::after { transform: translateY(-6px) rotate(-45deg); }
+
+@media (min-width: 1000px) {
+  .nav-toggle { display: none; }
+}
+
+/* Reads as a search field rather than a button: bordered pill, magnifier,
+   label, and the shortcut hint pushed to the far end. */
+.search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-start: auto;
+  padding: .4rem .55rem .4rem .7rem;
+  border: 1px solid var(--on-navy-line-strong);
+  border-radius: 999px;
+  background: var(--on-navy-fill);
+  color: var(--on-navy);
+  font: inherit;
+  font-size: .9rem;
+  line-height: 1.5;
+  cursor: pointer;
+  text-align: start;
+}
+.search-trigger:hover { background: var(--on-navy-fill-strong); border-color: rgba(255, 255, 255, .55); }
+.search-trigger:focus-visible { outline-color: #ffffff; }
+.search-trigger > span {
+  flex: 1 1 auto;
+  color: var(--on-navy-dim);
+  white-space: nowrap;
+}
+
+/* The header SVGs ship with no presentation attributes, so every stroke,
+   fill and size comes from here. The magnifier is stroke-drawn. */
+.search-trigger svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.search-trigger kbd {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  line-height: 1.5;
+  padding: .05rem .4rem;
+  border: 1px solid var(--on-navy-line-strong);
+  border-radius: 5px;
+  color: var(--on-navy-dim);
+}
+
+@media (min-width: 700px) {
+  .search-trigger { min-width: 210px; padding-inline: .8rem .5rem; }
+}
+@media (max-width: 699.98px) {
+  .search-trigger kbd { display: none; }
+}
+@media (max-width: 559.98px) {
+  /* No room for a field: fall back to an icon button. */
+  .search-trigger { width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: var(--radius-sm); }
+  .search-trigger > span { display: none; }
+}
+
+/* The GitHub mark is a filled path, not a stroked one. */
+.site-header__repo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--on-navy);
+  text-decoration: none;
+}
+.site-header__repo:hover { color: #ffffff; background: var(--on-navy-fill-strong); }
+.site-header__repo:focus-visible { outline-color: #ffffff; }
+.site-header__repo svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: currentColor;
+  stroke: none;
+}
+
+@media (max-width: 559.98px) {
+  .site-header__title, .site-header__product { display: none; }
+  .site-header__brand img { height: 30px; }
+}
+
+/* The top nav this header replaced. Kept so an older page still renders. */
 .site-nav { margin-left: auto; }
 
 .site-nav ul {
@@ -281,26 +521,234 @@ section { margin-bottom: 1rem; }
 }
 
 @media (max-width: 720px) {
-  .site-header__inner { padding-block: .75rem; }
-  .site-header__title { display: none; }
   .site-nav { margin-left: 0; width: 100%; }
   .site-nav ul { gap: .1rem 1rem; }
   .site-nav a { font-size: .9rem; }
 }
 
 /* -------------------------------------------------------------------------
-   6. Hero
+   6. Sidebar
+
+   CONTRACT WITH assets/js/site.js
+     .nav-toggle toggles class "is-open" on [data-sidebar] and flips its own
+     aria-expanded. It also injects ONE element carrying [data-sidebar-backdrop]
+     (a child of <body> is fine) and gives that "is-open" at the same time.
+     Clicking the backdrop, pressing Esc, or following a link closes both.
+   Below 1000px the sidebar is off-canvas, so with JS off the footer's link
+   columns are the navigation — and :focus-within below slides the drawer in
+   for anyone who tabs into it, so its links are never focusable off-screen.
+   ---------------------------------------------------------------------- */
+
+.sidebar {
+  position: fixed;
+  z-index: 45;
+  top: var(--header-h);
+  inset-inline-start: 0;
+  width: min(86vw, 310px);
+  height: 100vh;
+  height: calc(100dvh - var(--header-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.4rem 1.25rem 2.5rem;
+  background: var(--ground);
+  border-inline-end: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-lift);
+  transform: translateX(-100%);
+  transition: transform .24s ease;
+}
+.sidebar.is-open,
+.sidebar:focus-within { transform: none; }
+
+[data-sidebar-backdrop] {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .24s ease, visibility .24s ease;
+}
+[data-sidebar-backdrop].is-open { opacity: 1; visibility: visible; }
+
+/* Belt and braces: the backdrop follows the drawer even if the JS only ever
+   marks the drawer. Kept as its own rule — grouping it with the selector
+   above would void both in a browser without :has(). */
+body:has(.sidebar.is-open) [data-sidebar-backdrop] { opacity: 1; visibility: visible; }
+body:has(.sidebar.is-open) { overflow: hidden; }
+
+.sidebar__nav { font-size: .94rem; }
+
+.sidebar__group {
+  margin: 1.5rem 0 .4rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  max-width: none;
+}
+.sidebar__nav > .sidebar__group:first-child { margin-top: 0; }
+
+.sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+.sidebar__list li { margin: 0; }
+
+.sidebar__list > li > a {
+  display: block;
+  padding: .32rem .6rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  font-weight: 500;
+  text-decoration: none;
+}
+.sidebar__list > li > a:hover { color: var(--ink); background: var(--ground-soft); }
+.sidebar__list > li > a[aria-current="page"] {
+  color: var(--accent-text);
+  background: var(--accent-wash);
+  font-weight: 650;
+}
+
+/* The current page's own sections, hung off a hairline. .is-active is set by
+   the JS as the reader scrolls. */
+.sidebar__sections {
+  list-style: none;
+  margin: .25rem 0 .5rem .95rem;
+  padding: 0;
+  border-inline-start: 1px solid var(--rule);
+  font-size: .88rem;
+  max-width: none;
+}
+.sidebar__sections a {
+  display: block;
+  margin-inline-start: -1px;
+  padding: .22rem .65rem;
+  border-inline-start: 2px solid transparent;
+  color: var(--ink-muted);
+  text-decoration: none;
+  line-height: 1.45;
+}
+.sidebar__sections a:hover { color: var(--ink); border-inline-start-color: var(--rule-strong); }
+.sidebar__sections a.is-active {
+  color: var(--accent-text);
+  border-inline-start-color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar__meta {
+  margin: 2rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  font-size: .8rem;
+  line-height: 1.6;
+  color: var(--ink-muted);
+  max-width: none;
+}
+
+@media (min-width: 1000px) {
+  /* In flow, and sticky under the header on its own scrollbar. The explicit
+     height (not max-height) keeps the divider running the full viewport. */
+  .sidebar {
+    position: sticky;
+    align-self: start;
+    z-index: auto;
+    top: var(--header-h);
+    width: auto;
+    height: calc(100vh - var(--header-h));
+    height: calc(100dvh - var(--header-h));
+    padding: 1.75rem 1.4rem 2.5rem 0;
+    background: transparent;
+    border-inline-end: 1px solid var(--rule);
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   7. Contents rail
+
+   .is-active is set by the JS on the link for the section currently on
+   screen; it is the only coloured thing in the rail.
+   ---------------------------------------------------------------------- */
+
+.toc { display: none; }
+
+@media (min-width: 1240px) {
+  .toc {
+    display: block;
+    position: sticky;
+    align-self: start;
+    top: var(--header-h);
+    max-height: calc(100vh - var(--header-h));
+    max-height: calc(100dvh - var(--header-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1.85rem 0 2.5rem 1.5rem;
+    font-size: .84rem;
+  }
+}
+
+.toc__title {
+  margin: 0 0 .6rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  max-width: none;
+}
+
+.toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-inline-start: 1px solid var(--rule);
+  max-width: none;
+}
+.toc li { margin: 0; }
+
+.toc a {
+  display: block;
+  margin-inline-start: -1px;
+  padding: .25rem .75rem;
+  border-inline-start: 2px solid transparent;
+  color: var(--ink-muted);
+  text-decoration: none;
+  line-height: 1.45;
+}
+.toc a:hover { color: var(--ink); border-inline-start-color: var(--rule-strong); }
+.toc a.is-active {
+  color: var(--accent-text);
+  border-inline-start-color: var(--accent);
+  font-weight: 600;
+}
+
+.toc__sub a { padding-inline-start: 1.5rem; font-size: .96em; }
+
+/* -------------------------------------------------------------------------
+   8. Hero
    ---------------------------------------------------------------------- */
 
 .hero {
   background:
     linear-gradient(180deg, var(--ground-soft) 0%, var(--ground) 100%);
   border-bottom: 1px solid var(--rule);
-  padding-block: clamp(2.5rem, 6vw, 4.5rem);
+  padding-block: clamp(2rem, 5vw, 3.5rem);
   margin-bottom: 2.5rem;
 }
 .hero h1 { margin-bottom: .5rem; }
-.hero .lede { margin-bottom: 1.75rem; }
+.hero .lede, .hero .hero__lede { margin-bottom: 1.75rem; }
+
+/* The hero is a band, so it bleeds to both edges of the content column and
+   re-applies the column's padding to its own children. */
+.content > .hero {
+  margin-inline: calc(var(--content-pad) * -1);
+  padding-inline: var(--content-pad);
+}
+.content > .hero:first-child { margin-top: calc(var(--content-top) * -1); }
 
 .hero__actions {
   display: flex;
@@ -322,7 +770,7 @@ section { margin-bottom: 1rem; }
   line-height: 1.2;
 }
 .btn--primary { background: var(--accent-text); color: #ffffff; }
-.btn--primary:hover { background: #a81a3a; color: #ffffff; }
+.btn--primary:hover { background: color-mix(in srgb, var(--accent-text) 78%, var(--navy)); color: #ffffff; }
 .btn--ghost {
   background: transparent;
   color: var(--ink);
@@ -331,7 +779,7 @@ section { margin-bottom: 1rem; }
 .btn--ghost:hover { border-color: var(--navy-500); background: var(--ground-soft); }
 
 /* -------------------------------------------------------------------------
-   7. Badges
+   9. Badges
    ---------------------------------------------------------------------- */
 
 .badge {
@@ -365,7 +813,7 @@ section { margin-bottom: 1rem; }
 .badge-row li { margin: 0; }
 
 /* -------------------------------------------------------------------------
-   8. Cards
+   10. Cards
    ---------------------------------------------------------------------- */
 
 .card-grid {
@@ -426,7 +874,7 @@ a.card { transition: transform .15s ease, box-shadow .15s ease; }
 }
 
 /* -------------------------------------------------------------------------
-   9. Callouts
+   11. Callouts
    ---------------------------------------------------------------------- */
 
 .callout {
@@ -455,7 +903,7 @@ a.card { transition: transform .15s ease, box-shadow .15s ease; }
 .callout--ok { border-left-color: var(--ok-edge); }
 
 /* -------------------------------------------------------------------------
-   10. Tables
+   12. Tables
    ---------------------------------------------------------------------- */
 
 .table-scroll {
@@ -513,11 +961,30 @@ a.card { transition: transform .15s ease, box-shadow .15s ease; }
 .table .center { text-align: center; }
 
 @media (prefers-color-scheme: dark) {
-  .table .yes { color: #5fd39a; }
+  .table .yes { color: var(--ok-bright); }
 }
 
+/* A type signature, either a whole cell or one <code> inside one. Signatures
+   are long and full of punctuation, so this is the one place code is allowed
+   to wrap — otherwise a union type sets the width of the whole table. The
+   .table prefix is needed to outrank `.table td code { white-space: nowrap }`. */
+.api-sig {
+  font-family: var(--font-mono);
+  font-size: .875em;
+  line-height: 1.5;
+}
+.table .api-sig,
+.table td code.api-sig,
+.table th code.api-sig {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: none;
+}
+td.api-sig, th.api-sig { color: var(--ink); }
+
 /* -------------------------------------------------------------------------
-   11. Code
+   13. Code
    ---------------------------------------------------------------------- */
 
 code {
@@ -531,6 +998,7 @@ code {
 }
 
 pre.code {
+  position: relative;           /* anchor for the injected .copy-btn */
   margin: 1.25rem 0 1.75rem;
   padding: 1.1rem 1.25rem;
   background: var(--navy);
@@ -565,7 +1033,61 @@ pre.code:focus-visible { outline-color: var(--accent); }
 }
 
 /* -------------------------------------------------------------------------
-   12. Platform tabs (static, non-JS: a labelled row of anchors)
+   14. Syntax highlighting
+
+   The build wraps tokens in <span class="tok-*"> inside pre.code > code.
+   Scoped to pre.code on purpose: the navy block is the only surface these
+   values are contrast-checked against, so a token span that ever lands in
+   inline code inherits the safe default instead.
+
+   Palette: cool blues and teals with one warm sand for strings — the code
+   block reads as part of the Amthal palette, not as a rainbow. Every value
+   clears 4.5:1 on #121e4c, comments included (5.3:1).
+   ---------------------------------------------------------------------- */
+
+:root {
+  --tok-com: #8b98be;
+  --tok-str: #ecc48b;   /* the one warm hue: string literals */
+  --tok-num: #9adfc4;
+  --tok-kw: #7ec4f5;
+  --tok-typ: #b3bdf7;
+  --tok-fn: #8fd8f0;
+  --tok-attr: #c9d8f4;
+  --tok-op: #a4b3d6;
+  --tok-punc: #93a1c8;
+  --tok-var: #e3eaf9;   /* identifiers stay near the block's own ink */
+  --tok-tag: #7ec4f5;
+  --tok-lit: #7fd3ae;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* The code surface is navy in both schemes, so the palette carries over.
+       Only the dim end is re-tuned: against a dark page the same grey reads
+       dimmer than it does surrounded by white. */
+    --tok-com: #98a5c9;
+    --tok-punc: #9dabd0;
+  }
+}
+
+pre.code .tok-com  { color: var(--tok-com); font-style: italic; }
+pre.code .tok-str  { color: var(--tok-str); }
+pre.code .tok-num  { color: var(--tok-num); }
+pre.code .tok-kw   { color: var(--tok-kw); }
+pre.code .tok-typ  { color: var(--tok-typ); }
+pre.code .tok-fn   { color: var(--tok-fn); }
+pre.code .tok-attr { color: var(--tok-attr); }
+pre.code .tok-op   { color: var(--tok-op); }
+pre.code .tok-punc { color: var(--tok-punc); }
+pre.code .tok-var  { color: var(--tok-var); }
+pre.code .tok-tag  { color: var(--tok-tag); }
+pre.code .tok-lit  { color: var(--tok-lit); }
+
+/* -------------------------------------------------------------------------
+   15. Platform tabs
+
+   Static pages use a row of anchors; where the JS upgrades the row it swaps
+   in [role=tab] + [aria-selected] on the same markup. Both share one look.
    ---------------------------------------------------------------------- */
 
 .platform-tabs {
@@ -579,27 +1101,36 @@ pre.code:focus-visible { outline-color: var(--accent); }
   max-width: none;
 }
 .platform-tabs li { margin: 0; }
-.platform-tabs a {
+.platform-tabs a,
+.platform-tabs [role="tab"] {
   display: inline-block;
   padding: .45rem 1rem;
   border: 1px solid var(--rule-strong);
   border-radius: 999px;
   background: var(--ground);
   color: var(--ink);
+  font: inherit;
   font-size: .92rem;
   font-weight: 600;
+  line-height: 1.5;
   text-decoration: none;
+  cursor: pointer;
 }
-.platform-tabs a:hover { border-color: var(--navy-500); background: var(--ground-soft); }
+.platform-tabs a:hover,
+.platform-tabs [role="tab"]:hover { border-color: var(--navy-500); background: var(--ground-soft); }
 .platform-tabs a[aria-current="true"],
-.platform-tabs a.is-active {
+.platform-tabs a.is-active,
+.platform-tabs [role="tab"][aria-selected="true"] {
   background: var(--navy);
   border-color: var(--navy);
   color: #ffffff;
 }
 
+[role="tabpanel"] { margin-top: 1.25rem; }
+[role="tabpanel"][hidden] { display: none; }
+
 /* -------------------------------------------------------------------------
-   13. Screenshots
+   16. Screenshots
    ---------------------------------------------------------------------- */
 
 .shot-grid {
@@ -651,7 +1182,7 @@ pre.code:focus-visible { outline-color: var(--accent); }
 }
 
 /* -------------------------------------------------------------------------
-   14. Anchor lists (on-page contents, link lists)
+   17. Anchor lists (on-page contents, link lists)
    ---------------------------------------------------------------------- */
 
 .anchor-list {
@@ -681,7 +1212,7 @@ pre.code:focus-visible { outline-color: var(--accent); }
 .anchor-list .muted { display: block; font-size: .85rem; font-weight: 400; }
 
 /* -------------------------------------------------------------------------
-   15. Sequences (numbered flows, ordered steps)
+   18. Sequences (numbered flows, ordered steps)
    ---------------------------------------------------------------------- */
 
 .seq {
@@ -707,6 +1238,17 @@ pre.code:focus-visible { outline-color: var(--accent); }
 }
 .seq__row:last-child { border-bottom: 0; }
 .seq__row:nth-child(even) { background: var(--ground-soft); }
+
+/* The ::before counter below is itself the first grid item, so a row written with more than one
+   child auto-places its second, fourth… child back into the 2.75rem number column and renders a
+   paragraph one word per line. Pinning every real child to column 2 makes the row correct however
+   its content is marked up, rather than requiring each author to remember a wrapper div. */
+.seq__row > * { grid-column: 2; }
+
+/* A step whose heading and body are separate children still needs them to read as one block. */
+.seq__step { font-weight: 600; color: var(--ink); }
+.seq__body { color: var(--ink-muted); }
+.seq__body > :first-child { margin-top: .35rem; }
 
 .seq__row::before {
   counter-increment: seq;
@@ -739,7 +1281,7 @@ pre.code:focus-visible { outline-color: var(--accent); }
 }
 
 /* -------------------------------------------------------------------------
-   16. Definition lists (field references)
+   19. Definition lists (field references)
    ---------------------------------------------------------------------- */
 
 dl.fields { max-width: var(--measure); }
@@ -749,11 +1291,12 @@ dl.fields dt {
   font-weight: 650;
   margin-top: 1rem;
   color: var(--ink);
+  overflow-wrap: break-word;
 }
 dl.fields dd { margin: .2rem 0 0; padding-left: 1rem; border-left: 2px solid var(--rule); }
 
 /* -------------------------------------------------------------------------
-   17. Footer
+   20. Footer
    ---------------------------------------------------------------------- */
 
 .site-footer {
@@ -765,17 +1308,50 @@ dl.fields dd { margin: .2rem 0 0; padding-left: 1rem; border-left: 2px solid var
   font-size: .93rem;
 }
 .site-footer__inner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem 2.5rem;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 1.6fr);
+  gap: 2rem 3rem;
+  align-items: start;
+  max-width: var(--frame);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
 }
-.site-footer img { height: 40px; width: auto; display: block; }
-.site-footer p { margin: 0; max-width: 52ch; color: rgba(255, 255, 255, .82); }
+.site-footer img { height: 40px; width: auto; display: block; margin-bottom: .9rem; }
+.site-footer p { margin: 0; max-width: 46ch; color: rgba(255, 255, 255, .82); }
 .site-footer a { color: #ffffff; text-decoration-color: rgba(255, 255, 255, .55); }
 .site-footer a:hover { text-decoration-color: #ffffff; }
 .site-footer a:focus-visible { outline-color: #ffffff; }
+
+.site-footer__brand { max-width: 34ch; }
+.site-footer__brand img { display: block; margin-bottom: .85rem; }
+.site-footer__brand p { margin: 0; font-size: .88rem; line-height: 1.6; }
+
+.site-footer__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem 2rem;
+}
+.site-footer__head {
+  margin: 0 0 .6rem;
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+.site-footer__cols ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+.site-footer__cols li { margin: 0 0 .35rem; }
+.site-footer__cols a {
+  color: rgba(255, 255, 255, .8);
+  text-decoration: none;
+}
+.site-footer__cols a:hover { color: #ffffff; text-decoration: underline; text-decoration-color: #ffffff; }
+
 .site-footer__links {
   list-style: none;
   display: flex;
@@ -786,8 +1362,256 @@ dl.fields dd { margin: .2rem 0 0; padding-left: 1rem; border-left: 2px solid var
 }
 .site-footer__links li { margin: 0; }
 
+@media (max-width: 720px) {
+  .site-footer__inner { grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+}
+
 /* -------------------------------------------------------------------------
-   18. Utilities
+   21. Progressive enhancement — parts the JS builds
+
+   Nothing here exists until assets/js/site.js runs; each block states the
+   markup it expects so the two stay in step.
+   ---------------------------------------------------------------------- */
+
+/* COPY BUTTON
+   <button class="copy-btn" type="button">Copy</button> appended as the last
+   child of every <pre class="code">. The JS swaps in "Copied" and adds
+   .is-copied for a moment after a successful write.
+   Positioned against the pre's padding box, so on a block wide enough to
+   scroll it travels with the code rather than pinning to the viewport edge. */
+.copy-btn {
+  position: absolute;
+  top: .55rem;
+  inset-inline-end: .55rem;
+  z-index: 1;
+  padding: .25rem .6rem;
+  border: 1px solid var(--on-navy-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--on-navy-fill);
+  color: var(--on-navy);
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.6;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s ease, background-color .15s ease;
+}
+pre.code:hover .copy-btn,
+.copy-btn:focus-visible { opacity: 1; }
+.copy-btn:hover { background: var(--on-navy-fill-strong); }
+.copy-btn:focus-visible { outline-color: #ffffff; }
+.copy-btn.is-copied {
+  opacity: 1;
+  color: var(--ok-bright);
+  border-color: color-mix(in srgb, var(--ok-bright) 55%, transparent);
+}
+
+/* No hover to reveal it on, so it simply stays visible. */
+@media (hover: none) {
+  .copy-btn { opacity: .9; }
+}
+
+/* HEADING ANCHOR
+   <a class="heading-anchor" href="#id" aria-label="…">#</a> appended inside
+   every h2/h3. user-select:none keeps the # out of a copied heading. */
+.heading-anchor {
+  margin-inline-start: .35em;
+  padding-inline: .1em;
+  color: var(--accent-text);
+  font-weight: 400;
+  text-decoration: none;
+  opacity: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity .15s ease;
+}
+h2:hover > .heading-anchor,
+h3:hover > .heading-anchor,
+.heading-anchor:focus-visible { opacity: 1; }
+
+/* SEARCH DIALOG
+   <div class="search-dialog" data-search-dialog hidden>
+     <div class="search-dialog__backdrop" data-search-close></div>
+     <div class="search-dialog__panel" role="dialog" aria-modal="true" aria-label="Search">
+       <div class="search-dialog__field">
+         <svg class="search-dialog__icon">…</svg>
+         <input class="search-dialog__input" type="search" …>
+         <kbd>Esc</kbd>
+       </div>
+       <ul class="search-dialog__results" role="listbox">
+         <li><a class="search-result" role="option" href="page.html#id">
+           <span class="search-result__page">API reference</span>
+           <span class="search-result__section">Shared shapes</span>
+           <span class="search-result__excerpt">… <mark>bridge</mark> …</span>
+         </a></li>
+       </ul>
+       <p class="search-dialog__empty">No matches…</p>
+       <p class="search-dialog__hint">↑↓ move · ⏎ open · Esc close</p>
+     </div>
+   </div>
+   The selected row carries .is-selected — keyboard navigation, not hover. */
+.search-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(1rem, 8vh, 6rem) 1rem 2rem;
+}
+.search-dialog[hidden] { display: none; }
+
+.search-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+}
+/* If the JS uses a native <dialog>, the UA backdrop needs the same treatment. */
+.search-dialog::backdrop { background: var(--scrim); }
+
+.search-dialog__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: min(70vh, 620px);
+  background: var(--ground);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+
+.search-dialog__field {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .35rem 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+/* The input's own outline is suppressed, so the field's rule carries focus. */
+.search-dialog__field:focus-within { border-bottom-color: var(--accent); box-shadow: inset 0 -1px 0 var(--accent); }
+
+.search-dialog__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  color: var(--ink-muted);
+}
+
+.search-dialog__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: .85rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1.05rem;
+}
+.search-dialog__input:focus { outline: none; }
+.search-dialog__input::placeholder { color: var(--ink-muted); }
+
+.search-dialog kbd {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  padding: .1rem .4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 5px;
+  color: var(--ink-muted);
+}
+
+.search-dialog__results {
+  flex: 1 1 auto;
+  list-style: none;
+  margin: 0;
+  padding: .4rem;
+  max-width: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.search-dialog__results li { margin: 0; }
+
+.search-result {
+  display: grid;
+  gap: .1rem;
+  padding: .6rem .75rem;
+  border-radius: var(--radius-sm);
+  border-inline-start: 3px solid transparent;
+  color: var(--ink);
+  text-decoration: none;
+}
+.search-result:hover { background: var(--ground-soft); }
+.search-result.is-selected {
+  background: var(--accent-wash);
+  border-inline-start-color: var(--accent);
+}
+.search-result__page {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.search-result__section { font-weight: 650; line-height: 1.35; }
+.search-result__excerpt {
+  font-size: .87rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.search-result mark {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 .1em;
+}
+
+.search-dialog__empty {
+  margin: 0;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  color: var(--ink-muted);
+  max-width: none;
+}
+
+.search-dialog__hint {
+  margin: 0;
+  padding: .55rem 1rem;
+  border-top: 1px solid var(--rule);
+  background: var(--ground-soft);
+  color: var(--ink-muted);
+  font-size: .78rem;
+  max-width: none;
+}
+
+@media (max-width: 559.98px) {
+  /* A phone gets the whole screen — a floating card would leave the keyboard
+     covering half the results. */
+  .search-dialog { padding: 0; }
+  .search-dialog__panel {
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+  .search-dialog__hint { display: none; }
+}
+
+/* -------------------------------------------------------------------------
+   22. Utilities
    ---------------------------------------------------------------------- */
 
 .visually-hidden {
@@ -808,12 +1632,23 @@ dl.fields dd { margin: .2rem 0 0; padding-left: 1rem; border-left: 2px solid var
 .full { max-width: none; }
 
 /* -------------------------------------------------------------------------
-   19. Print
+   23. Print
    ---------------------------------------------------------------------- */
 
 @media print {
   .site-header, .site-footer, .hero__actions { background: #ffffff; color: #000000; }
+  .sidebar, .toc, .nav-toggle, .search-trigger, .site-header__repo,
+  .search-dialog, .copy-btn, .heading-anchor, [data-sidebar-backdrop] { display: none !important; }
+
+  .layout { display: block; max-width: none; padding: 0; }
+  .content { padding: 0; }
+  .content > .hero { margin-inline: 0; padding-inline: 0; }
+
   pre.code { background: #f4f4f4; color: #000000; border-color: #cccccc; }
+  /* The token palette is built for the navy block; on paper it is ink. */
+  pre.code [class^="tok-"] { color: #000000; }
+  pre.code .tok-com { color: #555555; }
+
   a { color: #000000; }
   .shot__frame { box-shadow: none; }
 }
