@@ -20,6 +20,7 @@ they can be linked and tracked by the contents rail.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import re
@@ -196,6 +197,20 @@ def index_entries(page: dict, body: str, tree: list[dict]) -> list[dict]:
 
 # --------------------------------------------------------------------------- regions
 
+def asset(path: str) -> str:
+    """An asset URL stamped with a short hash of its contents.
+
+    The site sits behind a CDN with a four-hour TTL, so a redeploy that reuses a filename is
+    served stale: the pages arrive new and their stylesheet arrives old, which renders the
+    layout as an unstyled list until the cache expires. A URL that changes when the bytes change
+    cannot be served stale, and needs no cache purge on deploy.
+    """
+    f = DOCS / path
+    if not f.exists():
+        return path
+    return f"{path}?v={hashlib.sha256(f.read_bytes()).hexdigest()[:10]}"
+
+
 def render_head(page: dict, site: dict) -> str:
     """The <head>. Identical everywhere except title, description and canonical URL."""
     title = html.escape(page["title"])
@@ -222,7 +237,7 @@ def render_head(page: dict, site: dict) -> str:
 <meta name="theme-color" content="#121e4c">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
-<link rel="stylesheet" href="assets/css/site.css">"""
+<link rel="stylesheet" href="{asset("assets/css/site.css")}">"""
 
 
 def render_header(page: dict, site: dict) -> str:
@@ -358,7 +373,8 @@ def render_footer(site: dict) -> str:
   </div>
 </footer>
 
-<script src="assets/js/site.js" defer></script>"""
+<script src="{asset("assets/js/site.js")}"
+        data-search-index="{asset("assets/search-index.json")}" defer></script>"""
 
 
 # --------------------------------------------------------------------------- assembly
@@ -417,27 +433,24 @@ def main() -> int:
                     help="report stale pages and exit non-zero instead of rewriting")
     args = ap.parse_args()
 
-    site, stale, index = NAV["site"], [], []
+    site, stale = NAV["site"], []
+    present = [p for p in NAV["pages"] if (DOCS / p["file"]).exists()]
     for page in NAV["pages"]:
-        path = DOCS / page["file"]
-        if not path.exists():
+        if page not in present:
             print(f"  skip   {page['file']} (not written yet)")
-            continue
-        records, new = build_page(page, site)
+
+    # Two passes, because the pages carry a content hash of the search index and the index is
+    # built from the pages. Pass one exists only to settle the index; pass two renders against
+    # the final hash, so a single run is already idempotent.
+    index: list[dict] = []
+    for page in present:
+        records, _ = build_page(page, site)
         index.extend(records)
-        if path.read_text(encoding="utf-8") == new:
-            print(f"  ok     {page['file']}")
-            continue
-        stale.append(page["file"])
-        if args.check:
-            print(f"  STALE  {page['file']}")
-        else:
-            path.write_text(new, encoding="utf-8")
-            print(f"  wrote  {page['file']} ({page.get('_painted', 0)} code blocks highlighted)")
 
     index_path = DOCS / "assets" / "search-index.json"
     payload = json.dumps(index, ensure_ascii=False, separators=(",", ":")) + "\n"
-    if index_path.exists() and index_path.read_text(encoding="utf-8") == payload:
+    index_current = index_path.exists() and index_path.read_text(encoding="utf-8") == payload
+    if index_current:
         print(f"  ok     assets/search-index.json ({len(index)} sections)")
     elif args.check:
         print("  STALE  assets/search-index.json")
@@ -445,6 +458,19 @@ def main() -> int:
     else:
         index_path.write_text(payload, encoding="utf-8")
         print(f"  wrote  assets/search-index.json ({len(index)} sections)")
+
+    for page in present:
+        path = DOCS / page["file"]
+        _, new_html = build_page(page, site)
+        if path.read_text(encoding="utf-8") == new_html:
+            print(f"  ok     {page['file']}")
+            continue
+        stale.append(page["file"])
+        if args.check:
+            print(f"  STALE  {page['file']}")
+        else:
+            path.write_text(new_html, encoding="utf-8")
+            print(f"  wrote  {page['file']} ({page.get('_painted', 0)} code blocks highlighted)")
 
     listed = [p for p in NAV["pages"] if p.get("listed", True)
               and (DOCS / p["file"]).exists()]

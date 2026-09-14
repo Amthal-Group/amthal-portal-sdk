@@ -540,7 +540,12 @@
     const triggers = $$('[data-search-open]');
     if (!triggers.length) return;
 
-    const INDEX_URL = 'assets/search-index.json';   // relative: served under a path prefix
+    // Relative, because the site is served under a path prefix. The generator stamps a
+    // content version onto the script tag so a CDN cannot serve last deploy's index
+    // against this deploy's anchors.
+    const INDEX_URL = document.currentScript?.dataset.searchIndex
+      || document.querySelector('script[data-search-index]')?.dataset.searchIndex
+      || 'assets/search-index.json';
     const MAX_RESULTS = 24;
     const currentPage = location.pathname.split('/').pop() || 'index.html';
 
