@@ -216,7 +216,9 @@ def render_head(page: dict, site: dict) -> str:
     title = html.escape(page["title"])
     desc = html.escape(page["description"])
     canonical = site["url"].rstrip("/") + "/" + page["file"]
-    social = site["url"].rstrip("/") + "/" + site["card"]
+    # Absolute, because a scraper resolves it out of context — but still versioned:
+    # Slack, Teams and X cache a card image far longer than the page that names it.
+    social = site["url"].rstrip("/") + "/" + asset(site["card"])
     return f"""<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
@@ -235,8 +237,8 @@ def render_head(page: dict, site: dict) -> str:
 <meta name="twitter:image" content="{social}">
 
 <meta name="theme-color" content="#121e4c">
-<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="icon" href="{asset("assets/img/favicon.svg")}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{asset("assets/img/apple-touch-icon.png")}">
 <link rel="stylesheet" href="{asset("assets/css/site.css")}">"""
 
 
