@@ -146,8 +146,13 @@ def normalise_content(body: str) -> str:
     # fixes every row at once, including ones written later.
     # (Implemented in the stylesheet as `.seq__row > * { grid-column: 2 }` — see site.css.)
 
-    # The counter already draws the number, so a literal "1. " in the heading renders it twice.
-    body = re.sub(r'(<h3[^>]*>)\s*\d+\.\s+', r'\1', body)
+    # The .seq counter already draws the number in its own badge, so a literal "1. " written
+    # into the step's title renders it twice. Steps are titled with <h3> on some pages and
+    # <strong> on others, so strip the prefix from both — but only inside a .seq row, where the
+    # counter exists. A numbered heading anywhere else is the author's own numbering.
+    def drop_double_number(m):
+        return re.sub(r'(<(?:h3|strong)[^>]*>)\s*\d+\.\s+', r'\1', m.group(0))
+    body = re.sub(r'<div class="seq__row">.*?</div>', drop_double_number, body, flags=re.S)
     return body
 
 

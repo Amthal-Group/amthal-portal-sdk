@@ -196,27 +196,27 @@
 
     <div class="seq">
       <div class="seq__row">
-        <strong>1. Your app authenticates</strong>
+        <strong>Your app authenticates</strong>
         <span>Your own login screen, against the Optimum Core API. You keep the token.</span>
       </div>
       <div class="seq__row">
-        <strong>2. You open the SDK</strong>
+        <strong>You open the SDK</strong>
         <span>Hand it <code>baseUrl</code>, the token, the <code>branchId</code> and which form to show.</span>
       </div>
       <div class="seq__row">
-        <strong>3. The SDK checks the portal</strong>
+        <strong>The SDK checks the portal</strong>
         <span>Fetches <code>/embed/manifest.json</code> and compares protocol and version floors before showing anything.</span>
       </div>
       <div class="seq__row">
-        <strong>4. The bridge handshakes</strong>
+        <strong>The bridge handshakes</strong>
         <span>The portal sends <code>hello</code>, the SDK replies <code>init</code> with your credentials and locale/theme.</span>
       </div>
       <div class="seq__row">
-        <strong>5. The form renders</strong>
+        <strong>The form renders</strong>
         <span>The portal sends <code>ready</code>, the SDK hides its splash, and your user is on the form.</span>
       </div>
       <div class="seq__row">
-        <strong>6. Submission comes back to you</strong>
+        <strong>Submission comes back to you</strong>
         <span><code>onSubmitted</code> fires with the application number. <strong>The SDK never auto-closes</strong> — what happens next is your decision.</span>
       </div>
     </div>
