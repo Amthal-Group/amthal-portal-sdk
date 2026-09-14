@@ -2,12 +2,20 @@ import UIKit
 
 /// Loading skeleton: a large activity indicator on the system background,
 /// shown from first load until the portal reports `ready`.
+///
+/// This is the screen the user actually waits on — it covers the manifest fetch, the page
+/// load and the bridge handshake, and only lifts on `ready`. It is therefore the one place
+/// the host's brand matters most, and the one place it was never applied: the indicator had
+/// no `color`, so every tenant's app waited on the same system grey.
 final class PortalSkeletonView: UIView {
     private let spinner = UIActivityIndicatorView(style: .large)
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    /// - Parameter brandColor: the host's brand colour, or `nil` to keep UIKit's default
+    ///   (which adapts to light/dark on its own). Never substitute a colour of our own here.
+    init(brandColor: UIColor? = nil) {
+        super.init(frame: .zero)
         backgroundColor = .systemBackground
+        if let brandColor { spinner.color = brandColor }
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.startAnimating()
         addSubview(spinner)

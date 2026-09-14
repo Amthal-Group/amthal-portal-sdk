@@ -21,9 +21,11 @@ final class DownloadHandler: NSObject {
         guard let url = URL(string: payload.url),
               let scheme = url.scheme?.lowercased()
         else { return }
-        // HTTPS only (http tolerated for localhost during development).
+        // HTTPS only (http tolerated for localhost — or any host when the
+        // DEV-only allowInsecureHTTP escape hatch is active).
         guard scheme == "https"
-                || (scheme == "http" && PortalConfig.isLocalhost(url.host ?? ""))
+                || (scheme == "http"
+                    && (PortalConfig.isLocalhost(url.host ?? "") || config.allowInsecureHTTP))
         else { return }
 
         self.presenter = presenter

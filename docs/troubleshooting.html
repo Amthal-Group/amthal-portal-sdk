@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting — Amthal Portal SDK</title>
+<meta name="description" content="Symptom, cause and fix for the failures integrators actually hit with the Amthal Portal SDK: manifest errors, the missing /portal prefix, Android emulator networking, dev certificates, registry 401s and every PortalErrorCode.">
+<link rel="stylesheet" href="assets/css/site.css">
+<link rel="icon" href="assets/img/amthal-logo.svg" type="image/svg+xml">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="site-header__brand" href="./index.html">
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="./index.html">Overview</a>
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./configuration.html">Configuration</a>
+      <a href="./api-reference.html">API reference</a>
+      <a href="./bridge-protocol.html">Bridge protocol</a>
+      <a href="./troubleshooting.html" aria-current="page">Troubleshooting</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="content">
+
+  <div class="hero">
+    <h1>Troubleshooting</h1>
+    <p>Almost every failed integration fails in one of a dozen ways, and nearly all of them are
+    configuration rather than code. This page is ordered the way a real investigation goes: four
+    commands that identify the problem, then the setup mistakes that cause most first-run failures,
+    then local-development networking, then every error code the SDK can raise and what to do about
+    each one.</p>
+  </div>
+
+  <nav class="anchor-list" aria-label="On this page">
+    <a href="#triage">Start here: four checks</a>
+    <a href="#setup">The five common setup mistakes</a>
+    <a href="#localdev">Local dev: emulators, simulators, dev certificates</a>
+    <a href="#errors">Every error code</a>
+    <a href="#auth">Sessions, tokens and 401s</a>
+    <a href="#platform">Platform-specific gotchas</a>
+    <a href="#report">What to send us</a>
+  </nav>
+
+  <!-- ================================================================= -->
+  <section id="triage">
+    <h2>Start here: four checks</h2>
+
+    <p>Run these before reading anything else. Between them they identify the cause of most support
+    tickets, and their output is what we will ask for if you open one.</p>
+
+    <div class="seq">
+      <div class="seq__row">
+        <h3>1. Is the manifest really a manifest?</h3>
+        <p>The SDK fetches <code>{baseUrl}/embed/manifest.json</code> before it renders anything. It
+        must be JSON, not the SPA shell.</p>
+<pre class="code"><code>curl -sI https://portal.example.com/portal/embed/manifest.json | grep -i content-type
+# expected: content-type: application/json</code></pre>
+        <p><code>text/html</code> means the single-page-app catch-all answered — the manifest is not
+        deployed, or your <code>baseUrl</code> is missing the deploy path prefix. A <code>404</code>
+        means the prefix is wrong. Either way you will see <code>manifestFailed</code> in the app.</p>
+      </div>
+
+      <div class="seq__row">
+        <h3>2. Does the embed route work in a desktop browser?</h3>
+        <p>Every embed route can be driven without a native host, against a portal built with the
+        development mock enabled:</p>
+<pre class="code"><code>https://portal.example.com/portal/embed/form/external/1234?mockEmbed=1
+
+# authenticated, and with the runtime settings the bridge would have sent:
+…?mockEmbed=1&amp;mockToken=&lt;jwt&gt;&amp;mockBranch=12&amp;mockLocale=ar&amp;mockTheme=dark&amp;mockFontScale=1.2&amp;mockPlatform=android</code></pre>
+        <p>If the form is broken there too, the problem is portal-side and no amount of SDK
+        configuration will fix it. Without <code>mockToken</code> the session is anonymous.</p>
+      </div>
+
+      <div class="seq__row">
+        <h3>3. Turn on SDK logging</h3>
+        <p>Set <code>enableLogging</code> in your config (keep it development-only). Every line is
+        prefixed <code>[AmthalPortal]</code> and covers the manifest result, blocked navigations,
+        dropped cross-origin messages and the portal's own <code>log</code> messages. It is
+        build-gated, so it is inert in release builds — <code>__DEV__</code> on React Native,
+        <code>#if DEBUG</code> on iOS, the debuggable flag on Android.</p>
+      </div>
+
+      <div class="seq__row">
+        <h3>4. Read the error <em>message</em>, not just the code</h3>
+        <p>Every <code>PortalError</code> carries a message that says which gate failed — which
+        protocol version the portal speaks, which version bound was violated, which HTTP status came
+        back. <code>httpStatus</code> is populated for <code>httpError</code> and for a non-2xx
+        manifest fetch. Log the whole object in development; show the user something calm.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="setup">
+    <h2>The five common setup mistakes</h2>
+
+    <div class="callout callout--danger">
+      <p><strong>If you read one thing on this page:</strong> <code>baseUrl</code> must include the
+      portal's deploy path prefix. The portal ships with <code>&lt;base href="/portal/"&gt;</code>,
+      so the correct value is <code>https://portal.example.com/portal</code> — not
+      <code>https://portal.example.com</code>.</p>
+    </div>
+
+    <h3>1. A blank form, or the user lands in Safari/Chrome the moment it opens</h3>
+    <p><strong>Cause.</strong> <code>baseUrl</code> is missing the path prefix. Navigation
+    confinement is computed as <em>base path</em> + <code>/embed</code>. With an empty base path the
+    portal's own very first in-app navigation looks like it leaves the allowed subtree, so the SDK
+    cancels it and hands the URL to the system browser — which is exactly what you would want it to
+    do for a genuinely external link.</p>
+    <p><strong>Fix.</strong> Add the prefix. A trailing slash is tolerated; a query string is not
+    (Android rejects one at construction time, the other hosts ignore it).</p>
+<pre class="code"><code>baseUrl: 'https://portal.example.com/portal'   // ✅
+baseUrl: 'https://portal.example.com'          // ❌ blank screen or a trip to the browser
+baseUrl: 'https://portal.example.com/portal/'  // ✅ tolerated
+baseUrl: 'https://portal.example.com/portal?x=1' // ❌ never</code></pre>
+
+    <h3>2. <code>manifestFailed</code> immediately, nothing renders</h3>
+    <p><strong>Cause.</strong> <code>{baseUrl}/embed/manifest.json</code> returned HTML (the SPA
+    catch-all), a 404, or nothing at all. This is the single most common first-run failure and it is
+    usually the same missing prefix as above.</p>
+    <p><strong>Fix.</strong> Check 1 in the triage list. If the URL is right and the content type is
+    right, the portal build does not ship the embed manifest — ask for a portal deployment that
+    does. The manifest is fetched from the <em>full base URL</em>, never from the bare origin.</p>
+
+    <h3>3. <code>npm install</code> fails with 401 on <code>@amthal-group/*</code></h3>
+    <p><strong>Cause.</strong> The packages are published to GitHub Packages. A missing, expired or
+    under-scoped token gets a 401 — there is no anonymous read.</p>
+    <p><strong>Fix.</strong> A classic personal access token with the <strong>read:packages</strong>
+    scope, in <code>~/.npmrc</code>:</p>
+<pre class="code"><code>@amthal-group:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=&lt;YOUR_PAT&gt;</code></pre>
+    <p>Verify with <code>npm view @amthal-group/portal-react-native version</code> — it should print
+    <code>1.0.0</code>. Two things that surprise people: working from a checkout of the SDK monorepo
+    needs <em>no</em> token at all (<code>npm install</code> at the repo root resolves the bridge
+    through npm workspaces, then <code>npm run build</code> once), and Android consumers need the
+    same token again as Gradle properties <code>gpr.user</code> / <code>gpr.key</code> for
+    <code>https://maven.pkg.github.com/Amthal-Group/amthal-portal-sdk</code>.</p>
+
+    <h3>4. A signed-in submission never appears in the customer's history</h3>
+    <p><strong>Cause.</strong> The request's <code>type</code> was not the literal string
+    <code>'internal'</code>. The portal compares it against that exact value; anything else
+    (<code>'external'</code> by convention) goes down the public plane, where the application is
+    filed against an anonymous stand-in. The submission <em>succeeds</em> — there is no error
+    anywhere — which is what makes it expensive to find.</p>
+    <p><strong>Fix.</strong> Pass <code>type: 'internal'</code> for a signed-in user, and
+    <code>'external'</code> only for genuinely public forms.</p>
+
+    <h3>5. Android hardware back does nothing, or leaves the screen without asking the form</h3>
+    <p><strong>Cause.</strong> <span class="badge">React Native</span> Without
+    <code>onCloseRequested</code> the wrapper installs no back handler at all, so the platform
+    default applies and the form never gets the chance to step back through its own wizard.</p>
+    <p><strong>Fix.</strong> Pass <code>onCloseRequested</code>. It is optional in the type
+    signature and effectively required in practice. If you also opted into predictive back
+    (<code>android:enableOnBackInvokedCallback</code>), confirm <code>BackHandler</code> still fires
+    on your React Native version.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="localdev">
+    <h2>Local dev: emulators, simulators, dev certificates</h2>
+
+    <p>Production integrations rarely hit these. Every team building against a laptop-hosted portal
+    hits all of them, usually in the same afternoon.</p>
+
+    <h3>A bare "Network Error" on the Android emulator is your development certificate</h3>
+    <p><strong>Symptom.</strong> Your own API calls (login, refresh) fail with
+    <code>Network Error</code> from axios or <code>Network request failed</code> from
+    <code>fetch</code> — no status, no body, no detail — and the SDK reports
+    <code>manifestFailed</code> or <code>loadFailed</code> for the same host. The identical URL works
+    in your laptop's browser and on the iOS simulator.</p>
+    <p><strong>Cause.</strong> Android's networking stack (OkHttp, under React Native's
+    <code>fetch</code> and axios alike) validates the TLS chain and has no interactive prompt. A
+    self-signed development certificate — the ASP.NET Core dev cert, or <code>ng serve --ssl</code>'s
+    generated one — has no trust anchor on the device, so the handshake is refused before any HTTP
+    happens. macOS and iOS trust it because you clicked "always trust" in Keychain once; the emulator
+    never saw that.</p>
+    <p><strong>Fix, in order of preference.</strong></p>
+    <ol>
+      <li><strong>Use the plain-HTTP development port.</strong> Serve the portal and the API over
+      <code>http://</code> locally and set <code>allowInsecureHttp</code> (iOS spells it
+      <code>allowInsecureHTTP</code>) alongside a scoped cleartext permission. This is the least
+      fragile option and it is what the flag exists for.</li>
+      <li><strong>Or install the certificate as a user CA and trust it in a debug build.</strong>
+      Pushing the PEM to the emulator and installing it under Settings is only half the job: since
+      API 24, apps do not trust user-added CAs unless they say so. You need a debug-only network
+      security config with <code>&lt;certificates src="user"/&gt;</code>.</li>
+    </ol>
+    <p><code>app/src/debug/res/xml/network_security_config.xml</code> — cleartext for a dev host, and
+    user CAs trusted, both scoped to debug builds only:</p>
+<pre class="code"><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;network-security-config&gt;
+  &lt;domain-config cleartextTrafficPermitted="true"&gt;
+    &lt;domain includeSubdomains="true"&gt;portal-dev.example.com&lt;/domain&gt;
+    &lt;domain includeSubdomains="true"&gt;10.0.2.2&lt;/domain&gt;
+    &lt;trust-anchors&gt;
+      &lt;certificates src="system"/&gt;
+      &lt;certificates src="user"/&gt;
+    &lt;/trust-anchors&gt;
+  &lt;/domain-config&gt;
+&lt;/network-security-config&gt;</code></pre>
+<pre class="code"><code>&lt;!-- app/src/debug/AndroidManifest.xml --&gt;
+&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"&gt;
+  &lt;application android:networkSecurityConfig="@xml/network_security_config" /&gt;
+&lt;/manifest&gt;</code></pre>
+    <p>On Expo, the equivalent cleartext switch is
+    <code>["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]</code> — keep it
+    out of production builds.</p>
+
+    <div class="callout callout--warn">
+      <p><strong>You cannot click through a bad certificate in the SDK's WebView.</strong> The
+      hardened WebView installs no SSL-error override, so an untrusted certificate cannot be accepted
+      at runtime the way a browser lets you. It fails as <code>loadFailed</code> and stays failed.
+      That is deliberate, and it is also why the two fixes above are the only two fixes.</p>
+      <p>Related, and often confused with it: Android's <code>certificatePinner</code> hook applies
+      only to HTTPS the SDK itself performs — the manifest fetch and downloads. It does not and
+      cannot pin the WebView's page load.</p>
+    </div>
+
+    <h3>The Android emulator ignores your laptop's <code>/etc/hosts</code></h3>
+    <p><strong>Symptom.</strong> You added <code>127.0.0.1 tenant.dev.local</code> to your Mac's
+    hosts file, the browser on your Mac resolves it, and the emulator cannot: Chrome inside the
+    emulator shows <code>ERR_NAME_NOT_RESOLVED</code> and the SDK reports <code>offline</code> (the
+    WebView maps host-lookup failures to that code).</p>
+    <p><strong>Cause.</strong> The emulator is a separate machine with its own resolver. Your host's
+    <code>/etc/hosts</code> means nothing to it, and its own copy is on a read-only system image.</p>
+    <p>This matters more than it sounds, because the portal and the Core API often derive the tenant
+    from the request host — so "just use the IP" changes which tenant you are talking to.</p>
+    <p><strong>Fix.</strong> Give Chromium a resolver rule. Both Chrome and the system WebView read a
+    command-line file, and <code>--host-resolver-rules</code> maps a name to an address without
+    touching DNS. <code>10.0.2.2</code> is the emulator's alias for your development machine.</p>
+<pre class="code"><code>adb root   # needs a Google APIs (non-Play-Store) system image
+
+# the system WebView — this is what the SDK renders in
+adb shell "echo '_ --host-resolver-rules=\"MAP tenant.dev.local 10.0.2.2\"' \
+  &gt; /data/local/tmp/webview-command-line"
+
+# Chrome, for testing the same URL by hand in the emulator's browser
+adb shell "echo '_ --host-resolver-rules=\"MAP tenant.dev.local 10.0.2.2\"' \
+  &gt; /data/local/tmp/chrome-command-line"
+adb shell am force-stop com.android.chrome</code></pre>
+    <p>The leading <code>_</code> is a placeholder: Chromium discards the first token as the program
+    name. Restart the app (and Chrome) after writing the file. On a Play-Store system image
+    <code>adb root</code> is unavailable — use <code>http://10.0.2.2:&lt;port&gt;</code> directly, or
+    point the emulator at a DNS server that resolves the name
+    (<code>emulator -dns-server …</code>).</p>
+    <p>Two related shortcuts worth knowing: <code>adb reverse tcp:4200 tcp:4200</code> makes
+    <code>localhost:4200</code> on a <em>physical</em> device reach your laptop, and both the React
+    Native and Android hosts accept <code>10.0.2.2</code> as a loopback address, so a plain-HTTP base
+    URL on that host needs no <code>allowInsecureHttp</code> at all.</p>
+
+    <h3>Everything works in debug and the portal refuses to open in release</h3>
+    <p><strong>Cause.</strong> The insecure-HTTP hatch is compiled or gated out of release builds on
+    every platform, by design. React Native fails with <code>loadFailed</code> and "Insecure baseUrl
+    rejected"; iOS throws <code>PortalConfigError.insecureBaseURL</code> out of
+    <code>PortalConfig.init</code>; Android's <code>PortalConfig</code> constructor throws
+    <code>IllegalArgumentException</code> and logs that the flag was ignored.</p>
+    <p><strong>Fix.</strong> Point release builds at an HTTPS portal. There is no production escape
+    hatch and there will not be one.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="errors">
+    <h2>Every error code, and what to do about it</h2>
+
+    <p>The codes are a closed set of eight, identical on all four hosts. React Native and Expo
+    deliver them as <code>PortalErrorInfo { code, message?, httpStatus? }</code>, iOS as
+    <code>PortalError</code> (with <code>code.httpStatus</code> and <code>code.rawValue</code>),
+    Android as <code>PortalError(code, message, httpStatus)</code>.</p>
+
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Code</th><th scope="col">What actually happened</th><th scope="col">What to do</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><code>offline</code></th>
+          <td>The device has no usable network, or the name did not resolve. React Native maps URL
+          error <code>-1009</code> and descriptions matching
+          <code>ERR_INTERNET_DISCONNECTED</code> / <code>ERR_NAME_NOT_RESOLVED</code>; Android maps
+          the WebView's <code>ERROR_HOST_LOOKUP</code>, <code>ERROR_CONNECT</code> and
+          <code>ERROR_TIMEOUT</code>; iOS maps the offline family of <code>NSURLErrorDomain</code>
+          codes — including on the manifest fetch, where the other hosts would say
+          <code>manifestFailed</code>.</td>
+          <td>Show a retry affordance. iOS and Android retry automatically when connectivity returns.
+          If it fires on a working connection, it is name resolution: see the emulator hosts section
+          above.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>loadFailed</code></th>
+          <td>Any page-load failure that is not one of the above, plus the configuration refusals: an
+          unparseable <code>baseUrl</code>, an insecure <code>baseUrl</code> in a release build, and
+          on iOS a portal URL that could not be composed. On the Expo sheet, <em>every</em>
+          presentation rejection is reported as <code>loadFailed</code>.</td>
+          <td>Read the message. An untrusted TLS certificate lands here on Android; so does asking
+          the Expo sheet for form delegation, which it does not implement.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>httpError</code></th>
+          <td>The main frame returned a non-2xx status, carried in <code>httpStatus</code>.
+          <span class="badge">Android</span> also reuses this code for download failures and for "no
+          app available to open the downloaded file".</td>
+          <td>401/403 means your token never reached the portal — see the session section. 404 means
+          the route does not exist at that path, which is usually the prefix again.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>manifestFailed</code></th>
+          <td>The manifest could not be fetched, was not JSON, or timed out (React Native aborts the
+          fetch at 10 s). A non-2xx fetch carries <code>httpStatus</code>.</td>
+          <td>Triage check 1. A 404 is the path prefix; <code>text/html</code> is the SPA catch-all;
+          a timeout means the host is simply unreachable from the device — VPN-only origin, wrong
+          port, or an emulator that cannot resolve the name.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>bridgeTimeout</code></th>
+          <td>The page finished loading but the portal's bridge shim never said
+          <code>hello</code> within 15 seconds.</td>
+          <td>You are on a page that is not an embed route — a login screen, a 404 shell, or a portal
+          build without embed mode. Open the same URL with <code>?mockEmbed=1</code> in a desktop
+          browser: if it hangs there too, it is portal-side.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>versionIncompatible</code></th>
+          <td>One of three gates failed before anything rendered: the manifest's
+          <code>bridgeProtocolVersion</code> is not 1; the portal is older than your
+          <code>minPortalVersion</code>; or the SDK is older than the manifest's
+          <code>minSdkVersion</code>. The message names which.</td>
+          <td>Upgrade the SDK, lower <code>minPortalVersion</code>, or ask for a portal deployment on
+          the matching protocol. Surface it to the user as "please update the app" — it is the one
+          code that is never retried automatically, because retrying cannot help.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>authExpired</code></th>
+          <td>The portal's own token refresh failed and it paused, waiting for fresh credentials from
+          you. Not a network failure.</td>
+          <td>Hand back a new token — see below. Note the routing differs per host: React Native
+          calls <code>onAuthExpired</code> if you supplied it and falls back to
+          <code>onError</code> if you did not; the Expo sheet <em>only</em> raises the
+          <code>onAuthExpired</code> event; iOS and Android raise it through the error channel as
+          well as showing their session-expired interstitial.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>webProcessTerminated</code></th>
+          <td>The web content process died — usually memory pressure with a large attachment. The SDK
+          reloads once by itself and only raises this code if the process dies a second time.</td>
+          <td>Offer a reload. If it is reproducible, capture the form and the attachment sizes and
+          send them to us; a deterministic renderer crash is a portal bug.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>If you do not supply a custom error view, the React Native wrapper shows these titles, so you
+    may recognise them from a screenshot: "No internet connection.", "The portal could not be
+    loaded.", "The portal returned an unexpected response.", "The portal could not be reached.",
+    "The portal did not respond in time.", "This app version is not compatible with the portal.
+    Please update the app.", "Your session has expired.", "The portal view stopped unexpectedly."</p>
+
+    <div class="shot">
+      <figure>
+        <img src="assets/screenshots/ios-splash.png" alt="The Amthal Portal SDK loading splash on iPhone: a brand-tinted wash with the host app's logo centred." width="1206" height="2622" loading="lazy">
+        <figcaption>The SDK's own loading screen. If it never goes away, nothing has failed yet —
+        you are waiting on the manifest, the page load, or <code>hello</code>. After 15 seconds
+        without <code>hello</code> it becomes <code>bridgeTimeout</code>. A splash that persists
+        <em>past</em> that without an error usually means the error callback is not wired.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="auth">
+    <h2>Sessions, tokens and 401s</h2>
+
+    <h3><code>authExpired</code> fires and the session never resumes</h3>
+    <p><strong>Cause.</strong> The refresh handed back nothing, or handed back the wrong field. The
+    portal stays paused until it receives an <code>auth</code> message, and the SDK's "refreshing
+    your session" overlay stays up until the web acknowledges it (or the 10-second round trip times
+    out).</p>
+    <p><strong>Fix.</strong> Always complete the handshake — call the <code>refresh</code> function
+    React Native hands you, or the handle's <code>updateAuth</code>, or the equivalent on iOS,
+    Android and the Expo session. They are the same code path. Check which property of your
+    authentication response actually carries the new token before you assume it is
+    <code>token</code>.</p>
+<pre class="code"><code>onAuthExpired={async (refresh, reason) =&gt; {
+  const next = await myAuth.refreshSession();   // your backend, your call
+  refresh({ token: next.token, branchId: next.branchId, user: next.user });
+}}</code></pre>
+    <p>Two behaviours worth knowing on React Native: changing the <code>auth</code> prop to a
+    different, non-empty token after the bridge is up re-sends it automatically, and swapping one
+    anonymous shape for another sends nothing at all.</p>
+
+    <h3>A public form returns 401 on every request</h3>
+    <p><strong>Cause.</strong> A token from an earlier signed-in session is still in the WebView's
+    storage. The portal's HTTP interceptor attaches it even to the public endpoints, and the API
+    rejects a stale token on an anonymous route just as firmly as on a private one.</p>
+    <p><strong>Fix.</strong> <span class="badge">React Native</span> Omit the <code>auth</code> prop
+    entirely. An <code>init</code> message with no <code>auth</code> key is how the portal is told
+    "public plane", and it clears its stored credentials. Passing <code>{ token: '' }</code> is
+    <em>not</em> the same thing and does not clear anything. On iOS, Android and the Expo sheet the
+    auth argument is not optional, so the blank-token form is what exists there.</p>
+
+    <h3>The user stays signed in after logging out of your app</h3>
+    <p><strong>Cause.</strong> The portal screen was never torn down, so its session outlived your
+    app's. The SDK sends <code>destroy</code> on unmount, the portal clears its persisted auth, and
+    the native hosts clear WebView storage best-effort — but none of that happens if the screen is
+    still mounted.</p>
+    <p><strong>Fix.</strong> Unmount the portal screen (or call <code>destroy</code> /
+    <code>dismiss</code>) as part of your logout, and discard your own stored token. Store tokens in
+    Keychain, Keystore or <code>expo-secure-store</code> — never <code>AsyncStorage</code>, never a
+    file, never a log line.</p>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="platform">
+    <h2>Platform-specific gotchas</h2>
+
+    <div class="card-grid">
+      <article class="card">
+        <h3>React Native</h3>
+        <ul>
+          <li><strong>Downloads that need a header silently fail.</strong> The default fallback opens
+          the URL with <code>Linking.openURL</code>, which cannot attach the
+          <code>headers</code> the portal supplied. Implement <code>onDownloadRequest</code> and
+          download it yourself.</li>
+          <li><strong>External links go the wrong way.</strong> <code>onOpenExternal</code> must
+          return <code>true</code> <em>only</em> when you handled the URL. Return <code>false</code>
+          (or omit the prop) to let the SDK open it.</li>
+          <li><strong><code>brandColor</code> appears to do nothing.</strong> Only
+          <code>#rgb</code>, <code>#rrggbb</code> and <code>#rrggbbaa</code> are accepted; anything
+          else is ignored without a warning. It tints the SDK's own splash and retry button, nothing
+          inside the form.</li>
+          <li><strong>The WebView's <code>originWhitelist</code> is not the security boundary.</strong>
+          Confinement is the configured origin plus the <code>/embed</code> subtree, enforced
+          separately. Do not "tighten" the whitelist and expect it to change anything.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h3>Expo</h3>
+        <ul>
+          <li><strong>It is Apple-only.</strong> The native sheet module declares the Apple platform
+          alone. On Android, use the inline React Native component.</li>
+          <li><strong>Expo Go cannot work</strong> — both paths contain native code. Use a
+          development build or a prebuild.</li>
+          <li><strong><code>onFormOp</code> is not supported.</strong> Passing it fails fast through
+          <code>onError</code> with <code>loadFailed</code> and returns a no-op session. Delegated
+          forms need the inline component.</li>
+          <li><strong>There is no <code>brandColor</code> here.</strong> The sheet always uses the
+          platform default tint for its interstitials.</li>
+          <li><strong><code>onSubmitted</code> drops <code>raw</code></strong> when the result
+          crosses to JavaScript, even though the type declares it. Use the identifiers.</li>
+          <li><strong>"Already presented" / "no presenter"</strong> rejections surface as
+          <code>loadFailed</code>; only one sheet can be up at a time.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h3>iOS</h3>
+        <ul>
+          <li><strong>The flag is spelled <code>allowInsecureHTTP</code></strong> here — capital
+          HTTP — and unlike the other hosts it is a throwing initialiser: a bad or insecure base URL
+          throws <code>PortalConfigError</code> out of <code>PortalConfig.init</code> rather than
+          reaching a callback.</li>
+          <li><strong>Plain HTTP also needs an ATS exception</strong> in <code>Info.plist</code>
+          (never <code>NSAllowsArbitraryLoads</code>, and never in a shipping build).</li>
+          <li><strong>Attachments need usage strings.</strong> Without
+          <code>NSCameraUsageDescription</code> / <code>NSPhotoLibraryUsageDescription</code> iOS
+          terminates the app the moment the picker opens.</li>
+          <li><strong>No release tag exists yet.</strong> Swift Package Manager must resolve the
+          repository by branch (<code>branch: "main"</code>); a version requirement cannot resolve
+          until the first tag is pushed.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h3>Android</h3>
+        <ul>
+          <li><strong>File pickers do nothing on a bare view host.</strong>
+          <code>AmthalPortalView</code> needs an activity-result launcher — call
+          <code>attachActivityResultRegistry(...)</code> (or
+          <code>attachActivityResultCaller(...)</code> from a Fragment, before creation). The
+          provided Activity and Fragment hosts wire it for you.</li>
+          <li><strong><code>start()</code> may be called once per view instance.</strong> Calling it
+          twice throws <code>IllegalStateException</code>; create a new view for a new session.</li>
+          <li><strong>The constructor is strict.</strong> It throws
+          <code>IllegalArgumentException</code> for a non-positive <code>fontScale</code>, a URL with
+          no scheme or host, a non-HTTPS URL that is not loopback or opted in, and — uniquely among
+          the four hosts — a <code>baseUrl</code> carrying a query string or fragment.</li>
+          <li><strong><code>httpError</code> is overloaded</strong> on this platform: it also covers
+          a failed download and "no app available to open the downloaded file". Read the message
+          before blaming the portal.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- ================================================================= -->
+  <section id="report">
+    <h2>What to send us</h2>
+
+    <p>If nothing above fits, a good report is usually answered in one reply and a vague one costs a
+    week. Include:</p>
+
+    <ul>
+      <li>The exact <code>baseUrl</code> string, copied from your config — prefix, scheme and all.</li>
+      <li>The output of <code>curl -sI {baseUrl}/embed/manifest.json</code> and of
+      <code>curl -s {baseUrl}/embed/manifest.json</code> from the same network as the device.</li>
+      <li>The full error object: <code>code</code>, <code>message</code> and <code>httpStatus</code>.
+      The message is the part that names the failing gate.</li>
+      <li>The <code>[AmthalPortal]</code> log lines from the failing run, with
+      <code>enableLogging</code> on.</li>
+      <li>Host and versions: React Native / Expo / native iOS / native Android, the SDK version, and
+      the <code>portalVersion</code> from the manifest.</li>
+      <li>Whether the same <code>?mockEmbed=1</code> URL reproduces it in a desktop browser — this
+      one line decides whether the bug is ours or the portal's.</li>
+    </ul>
+
+    <div class="callout">
+      <p>Never paste a token, a refresh token or a download <code>Authorization</code> header into a
+      ticket, a screenshot or a log file. The SDK deliberately keeps credentials out of URLs and out
+      of logs; a support thread is the usual place that guarantee gets broken.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    <p>Amthal Portal SDK — embed the Client Portal's forms inside your own iOS, Android and React
+    Native apps.</p>
+    <p><a href="https://github.com/Amthal-Group/amthal-portal-sdk">github.com/Amthal-Group/amthal-portal-sdk</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

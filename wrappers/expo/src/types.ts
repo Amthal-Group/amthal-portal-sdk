@@ -39,6 +39,11 @@ export interface PortalSdkConfig {
   allowedOrigins?: string[];
   /** Forward SDK diagnostics to the native log (DEBUG builds only). */
   enableLogging?: boolean;
+  /** DEV ONLY: permit a plain-`http://` base URL for non-localhost hosts
+   * (portal dev server bound to a tenant hostname). Only honored in DEBUG
+   * native builds; release builds always enforce HTTPS. On iOS the host app
+   * additionally needs an ATS exception for the dev domain. */
+  allowInsecureHttp?: boolean;
 }
 
 /** Credentials handed to the portal. */
@@ -91,6 +96,14 @@ export interface PresentPortalSheetOptions {
   onNavigate?: (navigation: { path: string; title?: string }) => void;
   /** The sheet was dismissed (swipe, Close, or `dismiss()`); listeners are torn down. */
   onClosed?: () => void;
+  /**
+   * Form delegation (bridge SPEC §4.1). NOT YET SUPPORTED on the native sheet
+   * path — the JS↔native↔web round-trip is not wired. Providing it makes
+   * `presentPortalSheet` fail fast via `onError` instead of silently letting
+   * the portal call its own HTTP endpoints with the wrong identity. Use the
+   * inline `AmthalPortalForm` (portal-react-native) for delegated forms.
+   */
+  onFormOp?: (request: import('@amthal-group/portal-bridge').FormOpRequestPayload) => Promise<unknown>;
 }
 
 /** Imperative handle to the presented sheet. */

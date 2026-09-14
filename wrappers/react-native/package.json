@@ -28,16 +28,24 @@
     "react-native-webview": ">=13"
   },
   "dependencies": {
-    "@amthal-group/portal-bridge": "file:../../bridge"
+    "@amthal-group/portal-bridge": "^1.0.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "react": "18.3.1",
-    "react-native": "0.76.5",
-    "react-native-webview": "^13.12.4",
+    "@types/react": "^19.2.0",
+    "react": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-webview": "^13.16.0",
     "typescript": "^5.6.0"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Amthal-Group/amthal-portal-sdk.git"
+  },
+  "homepage": "https://github.com/Amthal-Group/amthal-portal-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/Amthal-Group/amthal-portal-sdk/issues"
   }
 }

@@ -79,6 +79,22 @@ export interface PortalSdkConfig {
   /** 1.0 = default; the portal maps it to a root font-size adjustment. */
   fontScale?: number;
   /**
+   * Your brand colour, as `#rgb`, `#rrggbb` or `#rrggbbaa`, used for the SDK's OWN
+   * interstitials — the loading indicator and the retry button.
+   *
+   * This cannot come over the bridge: the overlay is on screen before the WebView can
+   * speak, so nothing the portal sends could colour the first frame. Set it here and the
+   * wait is your colour from the very first pixel.
+   *
+   * Omit it and the SDK uses the surface's own foreground rather than inventing a colour —
+   * deliberately plain, never another company's brand. An unparseable value is ignored the
+   * same way (a bad colour string crashes the platform on Android).
+   *
+   * The portal's own UI is themed server-side from the branch, so this only needs to match
+   * it, not replace it.
+   */
+  brandColor?: string;
+  /**
    * Minimum portal version this app supports. When the manifest reports an
    * older portal, the SDK fails with `versionIncompatible`.
    */
@@ -93,6 +109,15 @@ export interface PortalSdkConfig {
    * logs are always dropped in release builds, per SPEC §4.
    */
   enableLogging?: boolean;
+  /**
+   * DEV ONLY: permit a plain-`http://` base URL for non-localhost hosts.
+   * Needed when the portal dev server is bound to a tenant hostname (e.g.
+   * `http://portal-dev.example.com:4200/portal`) because the backend resolves
+   * the tenant from the request host/referer. Only honored in __DEV__ builds —
+   * release builds always enforce HTTPS regardless of this flag. On iOS the
+   * host app additionally needs an ATS exception for the dev domain.
+   */
+  allowInsecureHttp?: boolean;
 }
 
 /** Credentials handed to the portal (init / auth messages). */

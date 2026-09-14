@@ -4,6 +4,7 @@
   "private": true,
   "description": "Example bare React Native app embedding the Amthal Client Portal via @amthal-group/portal-react-native",
   "scripts": {
+    "prebuild": "node ./scripts/prebuild.mjs",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "start": "react-native start",

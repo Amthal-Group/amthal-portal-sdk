@@ -1,0 +1,40 @@
+name: Feature request
+description: Something the SDK should be able to do and cannot.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The integration problem, not the API you have in mind for it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What are you doing instead today?
+      description: >
+        If you have worked around it, say how — a workaround that is merely ugly and one that is
+        impossible argue for very different things.
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which part would change?
+      options:
+        - Bridge protocol (a new message or payload field)
+        - React Native wrapper
+        - Expo wrapper
+        - iOS SDK
+        - Android SDK
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: >
+        Note that a change to the bridge protocol also needs the portal side to ship it, so those
+        move on the portal's release cycle rather than the SDK's.

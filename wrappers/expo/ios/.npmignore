@@ -1,0 +1,10 @@
+# Deliberately (almost) empty, and it must stay that way.
+#
+# `Generated/` is git-ignored next door — it is a copy of ios/Sources/AmthalPortal and
+# must never be committed twice. But it is exactly what a consumer installing this
+# package from the registry needs, because their node_modules copy has no monorepo
+# above it to copy from (`prepack` vendors it in).
+#
+# npm falls back to .gitignore when a directory has no .npmignore, which would strip
+# Generated/ out of the tarball and leave the pod with no Swift sources at all. This
+# file exists so that fallback does not happen here.

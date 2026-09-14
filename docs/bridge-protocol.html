@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bridge protocol v1 — Amthal Portal SDK</title>
+<meta name="description" content="How the native shell and the embedded Amthal Client Portal talk: the hello/init/ready handshake, every bridge message, the manifest version gate, timeouts and the security rules.">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  /* Page-specific: the stepped sequence diagram. */
+  .seq__row { display: flex; gap: .9rem; align-items: flex-start; }
+  .seq__step { flex: 0 0 1.9rem; height: 1.9rem; border-radius: 50%; background: #121E4C; color: #fff; font-size: .85rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .seq__body { min-width: 0; flex: 1 1 auto; }
+  .seq__body > :first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a href="./index.html" class="site-header__brand">
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    </a>
+    <nav class="site-nav" aria-label="Documentation">
+      <a href="./index.html">Overview</a>
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./configuration.html">Configuration</a>
+      <a href="./api-reference.html">API reference</a>
+      <a href="./bridge-protocol.html" aria-current="page">Bridge protocol</a>
+      <a href="./troubleshooting.html">Troubleshooting</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+
+  <div class="hero">
+    <h1>Bridge protocol v1</h1>
+    <p>The Amthal Portal SDK does not screen-scrape a web page. It runs a <strong>typed, versioned message
+    protocol</strong> between your native shell and the Client Portal inside the WebView: the shell hands over
+    credentials, locale, theme and font scale; the portal hands back lifecycle events, submissions, navigation
+    and file requests. This page is the reader's edition of the normative specification in
+    <code>bridge/SPEC.md</code>, whose canonical type definitions live in <code>bridge/src/protocol.ts</code>.</p>
+    <p>You do not have to implement any of this to ship an integration — the React&nbsp;Native, Expo, iOS and
+    Android wrappers already do. Read it when you are debugging a session that never becomes ready, when you
+    need to know exactly what a callback is reporting, or when you are writing a host for a runtime we do not
+    ship yet.</p>
+  </div>
+
+  <nav class="anchor-list" aria-label="On this page">
+    <a href="#envelope">1. The envelope</a>
+    <a href="#transport">2. Transport</a>
+    <a href="#handshake">3. The handshake</a>
+    <a href="#catalogue">4. Message catalogue</a>
+    <a href="#payloads">5. Payload shapes</a>
+    <a href="#manifest">6. Manifest &amp; version gate</a>
+    <a href="#timings">7. Timeouts</a>
+    <a href="#security">8. Security rules</a>
+    <a href="#delegation">9. Form delegation</a>
+    <a href="#testing">10. Testing the bridge</a>
+  </nav>
+
+  <section id="envelope">
+    <h2>1. The envelope</h2>
+    <p>Every message, in both directions, is a single JSON object with the same five-field shape. There is no
+    second framing, no binary channel and no side band.</p>
+
+<pre class="code"><code>{
+  "v": 1,
+  "id": "&lt;unique-string&gt;",
+  "replyTo": "&lt;id of the request this answers, optional&gt;",
+  "type": "&lt;message type&gt;",
+  "payload": { }
+}</code></pre>
+
+    <ul>
+      <li><code>v</code> <strong>must</strong> be <code>1</code>. Every receiver compares it with strict equality
+      and <em>silently ignores</em> anything else — an envelope from a different protocol version is never an
+      error, it simply does not exist.</li>
+      <li><code>id</code> is unique per sender per session (a UUID v4 or equivalent).</li>
+      <li><code>replyTo</code> correlates an answer with its request. A message that carries <code>replyTo</code>
+      is never itself replied to.</li>
+      <li>An unknown <code>type</code> is ignored, and unknown payload fields are ignored. That is what makes
+      new optional messages and new optional fields additive: an older host and a newer portal keep working.</li>
+      <li>Input that is not valid JSON is dropped without a diagnostic — the web shim parses defensively because
+      anything on the page could post to the same hook.</li>
+    </ul>
+
+    <div class="callout">
+      <p><strong>Backwards compatibility rule.</strong> Additive changes — a new optional message type, a new
+      optional payload field — stay inside protocol&nbsp;1. A breaking change bumps the protocol version, and
+      the portal and the SDKs must each support <code>{N, N−1}</code> for one release cycle.</p>
+    </div>
+  </section>
+
+  <section id="transport">
+    <h2>2. Transport</h2>
+
+    <h3>Web → native</h3>
+    <p>The web shim (<code>bridge/src/web.ts</code>) probes the following hooks in order and uses the first one
+    present. The presence of any hook is what tells the portal it is <em>embedded</em>; with no hook it behaves
+    as an ordinary browser page and this protocol does not apply.</p>
+
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Hook</th><th scope="col">Host</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>window.__amthalAndroid.postMessage(json)</code></td>
+          <td>Android — an <code>addJavascriptInterface</code> object named <code>__amthalAndroid</code></td>
+        </tr>
+        <tr>
+          <td><code>window.webkit.messageHandlers.amthal.postMessage(json)</code></td>
+          <td>iOS — a <code>WKScriptMessageHandler</code> named <code>amthal</code></td>
+        </tr>
+        <tr>
+          <td><code>window.ReactNativeWebView.postMessage(json)</code><br>
+              <em>only if</em> <code>window.__AMTHAL_EMBEDDED_RN__ === true</code></td>
+          <td>React Native — <code>react-native-webview</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The React&nbsp;Native flag is set through <code>injectedJavaScriptBeforeContentLoaded</code>, deliberately:
+    without it the portal would mistake any arbitrary RN WebView that happens to expose
+    <code>ReactNativeWebView</code> for an Amthal host and start handing it lifecycle messages.</p>
+
+    <h3>Native → web</h3>
+    <p>The native side serializes the envelope to a JSON string <code>S</code>, then evaluates a call whose single
+    argument is <code>S</code> <em>JSON-encoded again</em>:</p>
+
+<pre class="code"><code>// envelope  -&gt;  S = {"v":1,"id":"…","type":"init","payload":{…}}
+window.__amthalReceive("{\"v\":1,\"id\":\"…\",\"type\":\"init\",\"payload\":{…}}")</code></pre>
+
+    <p>The double encoding is not an accident and must not be "simplified": it is what guarantees correct escaping
+    of quotes, newlines and non-BMP characters on every platform's JavaScript evaluation API.</p>
+
+    <p>Natives inject their hooks <strong>before page content loads</strong> — a <code>WKUserScript</code> at
+    <code>.atDocumentStart</code>, <code>addJavascriptInterface</code> before <code>loadUrl</code>,
+    <code>injectedJavaScriptBeforeContentLoaded</code>. The shim buffers inbound messages that arrive before the
+    Angular listeners attach, so a host may answer <code>hello</code> with <code>init</code> immediately, with no
+    further synchronisation.</p>
+  </section>
+
+  <section id="handshake">
+    <h2>3. The handshake — <code>hello</code> → <code>init</code> → <code>ready</code></h2>
+    <p>A session becomes usable in three messages, preceded by two things the native side does on its own: the
+    manifest fetch and the version gate. Each step below is a thing that can fail, and the error code it fails
+    with is named.</p>
+
+    <ol class="seq">
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">1</span>
+        <div class="seq__body">
+          <p><span class="badge">Native</span> <code>GET {baseUrl}/embed/manifest.json</code></p>
+          <p>Unauthenticated, before any route is loaded. <code>{baseUrl}</code> includes the portal's deploy path
+          prefix — the manifest is <em>never</em> fetched from the bare origin. Failure ⇒
+          <code>manifestFailed</code> (or <code>offline</code> when the device has no connectivity).</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">2</span>
+        <div class="seq__body">
+          <p><span class="badge">Native</span> version gate</p>
+          <p>Three comparisons against the manifest (<a href="#manifest">§6</a>). Any failure ⇒
+          <code>versionIncompatible</code>, and nothing is loaded.</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">3</span>
+        <div class="seq__body">
+          <p><span class="badge">Native</span> load <code>{baseUrl} + requestToPath(request)</code></p>
+          <p>The URL <em>is</em> the request: which form, which product, read-only or not. It never carries a
+          token, a branch id or any other credential. Load failure ⇒ <code>loadFailed</code>, a non-2xx main
+          frame ⇒ <code>httpError</code>.</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">4</span>
+        <div class="seq__body">
+          <p><span class="badge">Portal → native</span> <code>hello { protocolVersion, portalVersion }</code></p>
+          <p>Sent by the shim as early as possible — before Angular resolves a route — and <strong>re-sent every
+          10&nbsp;s</strong> until <code>init</code> arrives. If no <code>hello</code> reaches the host within
+          15&nbsp;s of the page finishing load, the host raises <code>bridgeTimeout</code>.</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">5</span>
+        <div class="seq__body">
+          <p><span class="badge">Native → portal</span>
+          <code>init { sdkVersion, platform, protocolVersion, configure, auth, formDelegation? }</code>
+          &nbsp;<em>(replyTo: the hello id)</em></p>
+          <p>Every <code>hello</code> is answered. <code>init</code> is idempotent — the portal applies the
+          latest one it received, so answering a retry costs nothing.</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">6</span>
+        <div class="seq__body">
+          <p><span class="badge">Portal</span> apply <code>configure</code>, seed <code>auth</code>, resolve the embed route</p>
+          <p>The portal must <strong>not</strong> activate any <code>/embed/*</code> route before
+          <code>init</code> is applied; it shows its own minimal loading state until then, underneath the SDK's
+          splash.</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">7</span>
+        <div class="seq__body">
+          <p><span class="badge">Portal → native</span> <code>ready { portalVersion, protocolVersion }</code></p>
+          <p>Exactly once per page load, after the first embed route resolves. The host hides its skeleton and
+          surfaces this to your app — <code>onReady</code> (React&nbsp;Native / Expo),
+          <code>portalReady(portalVersion:)</code> (iOS), <code>onPortalReady(portalVersion)</code> (Android).</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">8</span>
+        <div class="seq__body">
+          <p><span class="badge">Session active</span></p>
+          <p>From here the traffic is event-driven: submissions, navigation, external links, downloads, back
+          presses, dismiss guards, auth refreshes — all listed in <a href="#catalogue">§4</a>.</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Auth refresh, mid-session</h3>
+    <p>When the portal's own token refresh fails it does not log the user out and it does not close. It sends
+    <code>authExpired</code> and pauses behind an interstitial until the host hands it a fresh token.</p>
+
+    <ol class="seq">
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">1</span>
+        <div class="seq__body">
+          <p><span class="badge">Portal → native</span> <code>authExpired { reason? }</code></p>
+          <p>The portal pauses. Every SDK puts a "session expired" overlay up at this point.</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">2</span>
+        <div class="seq__body">
+          <p><span class="badge">Your app</span> obtain a fresh token, then call the SDK</p>
+          <p><code>refresh(auth)</code> from <code>onAuthExpired</code> or <code>ref.updateAuth(auth)</code>
+          (React&nbsp;Native — the same code path), <code>session.updateAuth(auth)</code> (Expo),
+          <code>controller.updateAuth(_:)</code> (iOS), <code>updateAuth(auth)</code> on the view, fragment or
+          activity (Android).</p>
+        </div>
+      </li>
+      <li class="seq__row">
+        <span class="seq__step" aria-hidden="true">3</span>
+        <div class="seq__body">
+          <p><span class="badge">Native → portal</span> <code>auth { token, branchId?, user? }</code></p>
+          <p>The portal acknowledges with <code>ack { ok }</code> and resumes, retrying the failed request where
+          that is feasible. The overlay clears on the ack — or on a 10&nbsp;s round-trip timeout, so a portal
+          that never answers cannot strand the user behind a spinner.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="callout callout--warn">
+      <p><strong>The host must have somewhere to get a token from.</strong> The SDK never talks to your
+      authentication API and cannot refresh anything by itself. If you do not wire a refresh path, the session
+      stays paused: React&nbsp;Native falls back to <code>onError({ code: 'authExpired' })</code> when no
+      <code>onAuthExpired</code> prop is given, iOS reports it through <code>portalError</code> as well as the
+      overlay, Expo routes it to its <code>onAuthExpired</code> event only, and Android moves the view into its
+      error state.</p>
+    </div>
+
+    <h3>Teardown</h3>
+    <p>The host sends <code>destroy</code>, waits up to 1&nbsp;s for an <code>ack</code> (best effort), then
+    releases the WebView. The portal clears its persisted auth (<code>USER_KEY</code>, <code>BRANCH_ID</code>)
+    on <code>destroy</code> whether or not the ack is delivered, and the native side clears WebView storage for
+    the portal origin.</p>
+  </section>
+
+  <section id="catalogue">
+    <h2>4. Message catalogue</h2>
+
+    <h3>Portal → native</h3>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Type</th><th scope="col">Payload</th><th scope="col">Meaning and host obligation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>hello</code></td><td><code>HelloPayload</code></td>
+          <td>First message once the shim boots. The host <strong>must</strong> answer with <code>init</code>; re-sent every 10&nbsp;s until it does.</td></tr>
+        <tr><td><code>ready</code></td><td><code>ReadyPayload</code></td>
+          <td>Angular booted, auth applied, first embed route resolved. Once per page load. Hide your skeleton here.</td></tr>
+        <tr><td><code>authExpired</code></td><td><code>AuthExpiredPayload</code></td>
+          <td>Token refresh failed inside the portal. Send a fresh <code>auth</code> (<a href="#handshake">§3</a>).</td></tr>
+        <tr><td><code>formSubmitted</code></td><td><code>FormSubmittedPayload</code></td>
+          <td>A submission succeeded. <strong>The SDK never auto-closes</strong> — your app decides what happens next (thank-you screen, dismiss, navigate to history).</td></tr>
+        <tr><td><code>formCancelled</code></td><td>—</td>
+          <td>The user left through the form's own close/finish affordance.</td></tr>
+        <tr><td><code>navigate</code></td><td><code>NavigatePayload</code></td>
+          <td>Informational; fired on every router navigation inside <code>/embed/*</code>. Useful for a native title bar or analytics.</td></tr>
+        <tr><td><code>openExternal</code></td><td><code>OpenExternalPayload</code></td>
+          <td>Open outside the WebView — system browser, <code>SFSafariViewController</code>, Custom Tabs — unless your handler intercepts it.</td></tr>
+        <tr><td><code>downloadRequest</code></td><td><code>DownloadRequestPayload</code></td>
+          <td>Download the URL <em>with the supplied <code>headers</code> attached</em> and present it natively (QuickLook / <code>ACTION_VIEW</code>). Header values must never be logged.</td></tr>
+        <tr><td><code>formOp</code></td><td><code>FormOpRequestPayload</code></td>
+          <td>A delegated form data operation. Only sent when <code>init.formDelegation === true</code> (<a href="#delegation">§9</a>).</td></tr>
+        <tr><td><code>haptic</code></td><td><code>HapticPayload</code></td>
+          <td>Optional feedback cue; a host may ignore it. Implemented on iOS; ignored on Android.</td></tr>
+        <tr><td><code>log</code></td><td><code>LogPayload</code></td>
+          <td>Diagnostics. Hosts <strong>must</strong> drop these in release builds.</td></tr>
+        <tr><td><code>ack</code></td><td><code>AckPayload</code> or a typed reply</td>
+          <td>Answer to a host request; always carries <code>replyTo</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Native → portal</h3>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Type</th><th scope="col">Payload</th><th scope="col">Meaning and reply</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>init</code></td><td><code>InitPayload</code></td>
+          <td>Reply to <code>hello</code>. Idempotent — the portal applies the most recent one.</td></tr>
+        <tr><td><code>auth</code></td><td><code>AuthPayload</code></td>
+          <td>(Re)issue credentials at any time. The portal acks.</td></tr>
+        <tr><td><code>configure</code></td><td><code>ConfigurePayload</code></td>
+          <td>Apply locale, theme or font scale at runtime. Switching to <code>'ar'</code> also flips the document to <code>dir=rtl</code>.</td></tr>
+        <tr><td><code>backPressed</code></td><td>—</td>
+          <td>Android hardware back. The portal replies <code>BackHandledPayload</code>: <code>{handled:true}</code> means the web consumed it (e.g. stepped back a form step), <code>{handled:false}</code> means the host should close. A timeout is treated as <code>{handled:false}</code>.</td></tr>
+        <tr><td><code>dismissRequested</code></td><td>—</td>
+          <td>iOS swipe-dismiss / ✕ guard. The portal replies <code>DismissStatePayload</code>: <code>{dirty:true}</code> means the host should show a confirm-discard prompt. A timeout is treated as <code>{dirty:false}</code>.</td></tr>
+        <tr><td><code>destroy</code></td><td>—</td>
+          <td>Teardown. The portal clears persisted auth; the host waits ≤1&nbsp;s for the ack, then releases the WebView.</td></tr>
+        <tr><td><code>ack</code></td><td><code>AckPayload</code></td>
+          <td>Generic acknowledgement; always carries <code>replyTo</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <p><strong>Why <code>backPressed</code> and <code>dismissRequested</code> are questions, not commands.</strong>
+      A multi-step form has its own idea of "back", and a half-filled form has unsaved work. Both messages ask
+      the portal first and fall back to the safe native behaviour on timeout, so the user is never trapped by a
+      web layer that stopped answering.</p>
+    </div>
+  </section>
+
+  <section id="payloads">
+    <h2>5. Payload shapes</h2>
+    <p>These are the canonical TypeScript definitions from <code>bridge/src/protocol.ts</code>. The Swift and
+    Kotlin SDKs mirror them exactly; where the naming differs on a native surface it is noted underneath.</p>
+
+<pre class="code"><code>export type PortalLocale = 'en' | 'ar';
+export type PortalTheme  = 'light' | 'dark' | 'system';
+export type HostPlatform = 'ios' | 'android' | 'react-native' | 'flutter';
+
+interface ConfigurePayload {
+  locale?: PortalLocale;
+  theme?: PortalTheme;
+  fontScale?: number;            // 1.0 = the portal's default
+}
+
+interface AuthPayload {
+  token: string;                 // backend bearer token
+  branchId?: string | null;
+  user?: unknown;                // optional pre-built portal user object
+}
+
+interface HelloPayload { protocolVersion: number; portalVersion: string; }
+interface ReadyPayload { portalVersion: string; protocolVersion: number; }
+
+interface InitPayload {
+  sdkVersion: string;
+  platform: HostPlatform;
+  protocolVersion: number;
+  configure: ConfigurePayload;
+  auth: AuthPayload;
+  formDelegation?: boolean;      // see §9
+}
+
+interface AuthExpiredPayload { reason?: string; }
+
+interface FormSubmittedPayload {
+  productID: number;
+  applicationNo?: number | string;
+  batchID?: number | string;
+  headerID?: number | string;
+  raw?: unknown;                 // opaque passthrough
+}
+
+interface NavigatePayload      { path: string; title?: string; }
+interface OpenExternalPayload  { url: string; }
+
+interface DownloadRequestPayload {
+  url: string;
+  filename?: string;
+  mime?: string;
+  headers?: Record&lt;string, string&gt;;   // e.g. Authorization — attach, never log
+}
+
+interface HapticPayload { style: 'light' | 'medium' | 'heavy' | 'success' | 'error'; }
+interface LogPayload    { level: 'debug' | 'info' | 'warn' | 'error'; message: string; data?: unknown; }
+
+interface BackHandledPayload  { handled: boolean; }   // ack to backPressed
+interface DismissStatePayload { dirty: boolean; }     // ack to dismissRequested
+interface AckPayload          { ok: boolean; error?: string; }</code></pre>
+
+    <div class="callout callout--warn">
+      <p><strong>Anonymous sessions: omit <code>auth</code>, never send an empty token.</strong> On
+      React&nbsp;Native, leaving the <code>auth</code> prop off produces an <code>init</code> with <em>no</em>
+      <code>auth</code> key at all — that absence is how the portal is told it is on the public plane and made
+      to drop stored credentials. Sending <code>{ token: '' }</code> instead is an authenticated session with a
+      broken token and behaves differently.</p>
+    </div>
+
+    <p>Two naming splits are worth knowing before you debug a payload by eye: the optional user object is
+    <code>user</code> in TypeScript, <code>userJSON</code> in Swift and <code>userJson</code> in Kotlin (the
+    native sides take it as an already-serialized JSON string); and the Expo wrapper stringifies
+    <code>user</code> into <code>userJSON</code> before it crosses into native code.</p>
+  </section>
+
+  <section id="manifest">
+    <h2>6. Manifest and the version gate</h2>
+    <p>Before loading any route the SDK fetches, without authentication:</p>
+
+<pre class="code"><code>GET {baseUrl}/embed/manifest.json
+
+{ "portalVersion": "1.8.0", "bridgeProtocolVersion": 1, "minSdkVersion": "1.0.0" }</code></pre>
+
+    <p>Three gates run against it. Any failure raises <code>versionIncompatible</code> and nothing is loaded; a
+    network failure instead raises <code>manifestFailed</code> (or <code>offline</code> when there is no
+    connectivity at all).</p>
+
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Gate</th><th scope="col">Rule</th><th scope="col">What it protects against</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Protocol</td><td><code>bridgeProtocolVersion</code> must equal a protocol version the SDK implements — today, exactly <code>1</code></td><td>A portal upgraded across a breaking protocol change talking to an app that cannot be updated.</td></tr>
+        <tr><td>Portal floor</td><td><code>portalVersion</code> ≥ your <code>minPortalVersion</code>, when you set one</td><td>A tenant still running an older portal than the one your release was tested against.</td></tr>
+        <tr><td>SDK floor</td><td>The SDK's own version ≥ the manifest's <code>minSdkVersion</code>, when present</td><td>An old app build against a portal that now requires newer host behaviour.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout--danger">
+      <p><strong>The manifest is fetched relative to the full base URL, never the bare origin.</strong> The portal
+      deploys under a path prefix (<code>&lt;base href="/portal/"&gt;</code>), so
+      <code>https://portal.example.com/portal</code> is a correct <code>baseUrl</code> and
+      <code>https://portal.example.com</code> is not. Check it from a terminal before you blame the SDK:</p>
+<pre class="code"><code>curl -sI https://portal.example.com/portal/embed/manifest.json</code></pre>
+      <p>A <code>content-type: application/json</code> is what you want. <code>text/html</code> means the SPA
+      catch-all served <code>index.html</code> — the request never reached a real manifest — and the session
+      will fail with <code>manifestFailed</code>.</p>
+    </div>
+
+    <p>Setting <code>minPortalVersion</code> is the deliberate way to make an incompatibility visible: catch
+    <code>versionIncompatible</code> in your error handler and show "please update the app" rather than a blank
+    form.</p>
+  </section>
+
+  <section id="timings">
+    <h2>7. Timeouts</h2>
+    <p>Every timeout in the protocol is a constant in <code>TIMINGS</code>, shared by all four hosts. They are
+    normative: a host that waits longer hangs the user, one that waits less will fail on a slow network.</p>
+
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Constant</th><th scope="col">Value</th><th scope="col">Who waits, and what happens on expiry</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>helloTimeoutMs</code></td><td>15&nbsp;000&nbsp;ms</td>
+          <td>The host, after the page finishes loading. No <code>hello</code> ⇒ <code>bridgeTimeout</code>.</td></tr>
+        <tr><td><code>initTimeoutMs</code></td><td>10&nbsp;000&nbsp;ms</td>
+          <td>The portal, after sending <code>hello</code>. No <code>init</code> ⇒ it re-sends <code>hello</code> and keeps waiting.</td></tr>
+        <tr><td><code>requestTimeoutMs</code></td><td>10&nbsp;000&nbsp;ms</td>
+          <td>Default for any request/ack round trip — <code>auth</code>, <code>backPressed</code>, <code>dismissRequested</code>. On expiry the host applies the safe default (<code>handled:false</code>, <code>dirty:false</code>, clear the refresh overlay).</td></tr>
+        <tr><td><code>formOpTimeoutMs</code></td><td>20&nbsp;000&nbsp;ms</td>
+          <td>Delegated form <em>reads</em> (<a href="#delegation">§9</a>).</td></tr>
+        <tr><td><code>formSubmitTimeoutMs</code></td><td>90&nbsp;000&nbsp;ms</td>
+          <td>Delegated form <em>writes</em> — validate and submit, which may carry base64 attachments.</td></tr>
+        <tr><td>destroy ack</td><td>1&nbsp;000&nbsp;ms</td>
+          <td>The host, during teardown. Best effort only: the WebView is released either way.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="security">
+    <h2>8. Security rules</h2>
+    <p>These are normative requirements on every host implementation, not recommendations. If you are writing
+    your own host, this section is the part you must not simplify.</p>
+
+    <h3>Credentials never travel in a URL</h3>
+    <p>Tokens, branch ids and user objects cross only inside <code>init</code> and <code>auth</code> payloads —
+    never in a path, a query string or a fragment. The navigation URL carries the <em>request</em> (form type,
+    product, batch, header, read-only) and nothing else. This keeps credentials out of WebView history, out of
+    server access logs and out of any <code>Referer</code> a page might emit.</p>
+
+    <h3>Origin and path confinement</h3>
+    <ul>
+      <li>Main-frame navigation is restricted to the configured portal origin <strong>and</strong> the
+      <code>basePath + /embed</code> subtree. Anything else is cancelled and routed through the
+      <code>openExternal</code> path instead — so an in-portal link to a marketing site opens in the system
+      browser rather than replacing your embedded form.</li>
+      <li>Path checks use the deployment's real base path, never a literal <code>/embed</code> prefix. The shared
+      helpers <code>basePathOf()</code> and <code>isEmbedPath()</code> exist so that no host re-implements this
+      comparison and gets it wrong.</li>
+      <li>Before dispatching any inbound message, and before every native→web evaluation, the host verifies that
+      the WebView's <em>current</em> URL origin is still the configured portal origin.</li>
+    </ul>
+
+    <div class="callout callout--warn">
+      <p><strong>The most common integration failure lives in this rule.</strong> Confinement is computed as
+      <code>basePath + '/embed'</code>. If you configure <code>baseUrl</code> without the portal's deploy prefix,
+      <code>basePath</code> is empty, the portal's very first in-app navigation looks like it is outside the
+      subtree, and the user is thrown into the system browser instead of the form. The symptom looks like a
+      routing bug; the cause is one missing path segment.</p>
+    </div>
+
+    <h3>Transport</h3>
+    <ul>
+      <li>HTTPS only. An <code>http:</code> base URL is rejected at config time, with a loopback exception for
+      development (<code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code>, and <code>10.0.2.2</code> on
+      the Android emulator). The escape hatch for a non-loopback plain-HTTP dev portal is build-gated on every
+      platform — <code>__DEV__</code>, <code>#if DEBUG</code>, <code>FLAG_DEBUGGABLE</code> — so it is inert in a
+      release build.</li>
+      <li>Android: file-access flags off, mixed content never allowed. iOS: no link preview on the form view.</li>
+    </ul>
+
+    <h3>Data at rest and in logs</h3>
+    <ul>
+      <li>On <code>destroy</code> — and on host-app logout — the portal clears its persisted auth
+      (<code>USER_KEY</code>, <code>BRANCH_ID</code>) and the host clears WebView storage for the portal
+      origin.</li>
+      <li><code>downloadRequest.headers</code> may contain an <code>Authorization</code> value. Attach it to the
+      request; never write it to a log.</li>
+      <li><code>log</code> messages from the portal are dropped in release builds, and the SDKs' own
+      <code>enableLogging</code> flag is honoured only in debug builds.</li>
+      <li>Store the token your app hands to <code>auth</code> in the Keychain, the Android Keystore or
+      <code>expo-secure-store</code> — never in plain async storage, a file or a log line.</li>
+    </ul>
+  </section>
+
+  <section id="delegation">
+    <h2>9. Form delegation — when the host owns the data plane</h2>
+    <p>By default the portal calls its own HTTP endpoints for form data: it is a customer-plane application with
+    a customer token. Some hosts cannot work that way — a back-office app whose staff identity must hit the
+    internal <code>/DMS/Forms/*</code> endpoints, with per-login pre-entrance checks the portal must not know
+    about. Form delegation is the additive protocol&nbsp;1 capability for exactly that case: the portal becomes
+    a pure renderer and every data operation crosses the bridge.</p>
+
+    <div class="callout callout--warn">
+      <p><strong>Only the React&nbsp;Native wrapper implements form delegation.</strong> It is not available on
+      iOS, Android or the Expo sheet. The Expo wrapper fails fast if you pass <code>onFormOp</code>: it reports
+      <code>onError({ code: 'loadFailed', … })</code> and returns a no-op session rather than presenting a sheet
+      that would silently render nothing.</p>
+    </div>
+
+    <ul>
+      <li>The host opts in by sending <code>formDelegation: true</code> in <code>init</code>. In React&nbsp;Native
+      that flag is derived purely from the presence of an <code>onFormOp</code> prop.</li>
+      <li>While delegation is active the portal <strong>must not</strong> call its own form HTTP endpoints inside
+      <code>/embed/*</code>, and must not fall back to them on a timeout — a delegated session that fails
+      surfaces a load/submit error rather than quietly using the wrong identity.</li>
+      <li><code>params</code> carries route and product values only (<code>productID</code>,
+      <code>batchID</code>, <code>headerID</code>, <code>workflowDetailID</code>, <code>isEdit</code>, …). The
+      portal never sends identity — no user id, no token, no branch. The host owns identity and augments the
+      call.</li>
+      <li>Multipart bodies cross as ordered <code>entries</code>. The host must rebuild the body
+      <em>preserving entry order and duplicate keys</em>; a map would lose both.</li>
+      <li>A reply with <code>status: 401</code> makes the portal run its embedded auth-expired flow, i.e. it
+      sends <code>authExpired</code> and waits for a fresh <code>auth</code>.</li>
+    </ul>
+
+<pre class="code"><code>type FormOp =
+  | 'getCategories'
+  | 'getFormSchema'          // whole render shape in one call — there is no second templates call
+  | 'getFormFields'
+  | 'validateForm'
+  | 'submitForm'
+  | 'getWorkflowDetails'
+  | 'submitFinalApproval'
+  | 'submitForApproval';
+
+type SerializedFormEntry =
+  | { key: string; value: string }
+  | { key: string; file: { name: string; type: string; dataBase64: string } };
+
+interface FormOpRequestPayload {
+  op: FormOp;
+  params: Record&lt;string, string&gt;;
+  entries?: SerializedFormEntry[];   // validateForm / submitForm
+  body?: unknown;                    // JSON ops (submitForApproval)
+}
+
+interface FormOpResponsePayload {
+  ok: boolean;
+  body?: unknown;    // the raw response body the portal's HTTP client would have parsed
+  error?: string;    // human-readable, surfaced in the portal UI when ok=false
+  status?: number;   // 401 triggers the auth-expired flow
+}</code></pre>
+
+    <p>On the React&nbsp;Native side this is one async prop: <code>onFormOp(request) =&gt; Promise&lt;unknown&gt;</code>.
+    Resolve it with the response body; throw to signal failure.</p>
+  </section>
+
+  <section id="testing">
+    <h2>10. Testing the bridge</h2>
+
+    <h3>Drive the embed routes from a desktop browser</h3>
+    <p>A <code>-dev</code> portal build ships a mock native host, so you can exercise the embedded plane — the
+    same routes, the same <code>init</code> payload shape — without building an app. Every value the real host
+    would send is a query parameter:</p>
+
+<pre class="code"><code>{baseUrl}/embed/form/external/{productID}?mockEmbed=1
+{baseUrl}/embed/form/internal/{productID}?mockEmbed=1&amp;mockToken=&lt;jwt&gt;&amp;mockBranch=12
+
+# optional, in any combination
+&amp;mockLocale=ar   &amp;mockTheme=dark   &amp;mockFontScale=1.2
+&amp;mockPlatform=ios|android|react-native</code></pre>
+
+    <p>The default is deliberately <strong>anonymous</strong>: with no <code>mockToken</code> the mock host sends
+    an <code>init</code> that carries no auth, which is the public plane exactly as a real anonymous session sees
+    it. <code>mockPlatform</code> changes which transport hint the portal believes it is running under, which is
+    how you reproduce a platform-specific rendering difference from a laptop.</p>
+
+    <h3>Conformance</h3>
+    <p>A host implementation is conformant when it passes the scripted sequences in
+    <code>bridge/conformance/</code>: the handshake happy path, hello-retry, the auth-expiry round trip, both
+    answers to a back press, both answers to the dismiss guard, destroy teardown, unknown-type ignore,
+    wrong-<code>v</code> ignore, and origin-violation drop. <code>MockNativeHost</code>
+    (<code>bridge/src/mock.ts</code>) drives the web side; a static portal build plus scripted pages drive the
+    native side.</p>
+
+    <h3>Reading a failed session</h3>
+    <p>The error code tells you which stage of <a href="#handshake">§3</a> broke: <code>manifestFailed</code> and
+    <code>versionIncompatible</code> happen before anything is loaded; <code>loadFailed</code>,
+    <code>httpError</code> and <code>offline</code> are the page load itself; <code>bridgeTimeout</code> means
+    the page loaded but the shim never spoke, which almost always means the URL was not an
+    <code>/embed/*</code> route on a portal build that ships the shim. Each code, with its per-platform triggers,
+    is listed on the <a href="./troubleshooting.html">Troubleshooting</a> page.</p>
+  </section>
+
+  <div class="callout">
+    <p><strong>Changing the protocol.</strong> <code>bridge/src/protocol.ts</code> is the single source of truth
+    and every native implementation mirrors its shapes exactly. Any change to it is a protocol change and
+    requires a <code>SPEC.md</code> pull request first — spec, then code, then the four hosts.</p>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    <p>Amthal Portal SDK — embed Client Portal forms natively in iOS, Android, React&nbsp;Native and Expo apps.</p>
+    <p><a href="https://github.com/Amthal-Group/amthal-portal-sdk">github.com/Amthal-Group/amthal-portal-sdk</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

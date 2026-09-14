@@ -32,6 +32,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -57,10 +58,13 @@ import type {
   AuthExpiredPayload,
   AuthPayload,
   BackHandledPayload,
+  DismissStatePayload,
   BridgeEnvelope,
   ConfigurePayload,
   DownloadRequestPayload,
   EmbedManifest,
+  FormOpRequestPayload,
+  FormOpResponsePayload,
   FormSubmittedPayload,
   LogPayload,
   NativeToWebType,
@@ -69,6 +73,7 @@ import type {
   PortalErrorCode,
   PortalFormRequest,
 } from '@amthal-group/portal-bridge';
+import { PortalSplash } from './PortalSplash';
 import { SDK_VERSION } from './version';
 import type {
   FormSubmitResult,
@@ -84,8 +89,14 @@ import type {
 export interface AmthalPortalFormProps {
   /** Portal configuration (baseUrl is required). */
   config: PortalSdkConfig;
-  /** Credentials seeded into `init` and re-sent when the prop changes. */
-  auth: PortalAuthState;
+  /**
+   * Credentials seeded into `init` and re-sent when the prop changes.
+   *
+   * Omit it entirely for an anonymous session: `init` then carries no `auth` key at all, which
+   * is how the portal is told to render the public plane and to drop any credentials a previous
+   * launch left in the WebView's storage. Do NOT pass `{ token: '' }` to mean the same thing.
+   */
+  auth?: PortalAuthState;
   /** What to show — mapped to a portal URL via `resolveEmbedUrl`. */
   request: PortalFormRequest;
 
@@ -117,6 +128,17 @@ export interface AmthalPortalFormProps {
   /** Informational router navigation inside /embed/* (path + optional title). */
   onNavigate?: (navigation: NavigatePayload) => void;
   /**
+   * Form delegation (bridge SPEC §4.1): when provided, the SDK declares
+   * `formDelegation: true` in `init` and the portal routes every form data
+   * operation here instead of calling its own HTTP endpoints — the host
+   * performs the API call with its own identity/plane (e.g. backoffice
+   * /DMS/Forms/* with a staff token, plus any per-login pre-entrance checks)
+   * and resolves with the raw response body. Reject (or resolve
+   * `{ok:false,...}` via throw) to surface an error in the portal UI; throw
+   * an object with `status: 401` to trigger the portal's auth-expired flow.
+   */
+  onFormOp?: (request: FormOpRequestPayload) => Promise<unknown>;
+  /**
    * Android hardware back was pressed and the web did NOT consume it
    * (`{handled:false}` or 10 s timeout) — the host should close this screen.
    * When omitted, the SDK does not intercept the hardware back button at all
@@ -142,6 +164,16 @@ export interface AmthalPortalFormHandle {
    * (`{handled:false}` reply or 10 s timeout).
    */
   handleBackPress: () => Promise<boolean>;
+  /**
+   * Ask the web whether the form has unsaved input (`dismissRequested` → `{dirty}`).
+   * Resolves `true` when it is safe to close without warning the user.
+   *
+   * Use this for a gesture or button that CLOSES rather than goes back — an iOS sheet's
+   * swipe-to-dismiss, or a ✕ in your own header — where there is no hardware back for
+   * `handleBackPress` to model. A timeout or an unopened bridge resolves `true`: a broken
+   * bridge must not trap the user in a screen they cannot leave.
+   */
+  requestDismiss: () => Promise<boolean>;
   /** Send `destroy` (best-effort) and stop all bridge activity. */
   destroy: () => void;
 }
@@ -224,7 +256,7 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
     // generic with `P = undefined`, and `WebViewProps & undefined` collapses
     // to `never` under TS ≥4.8, breaking every prop. `object` is the identity.
     const webviewRef = useRef<WebView<object>>(null);
-    const authRef = useRef<PortalAuthState>(auth);
+    const authRef = useRef<PortalAuthState | undefined>(auth);
     const pendingRef = useRef<Map<string, PendingRequest>>(new Map());
     const helloTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const helloReceivedRef = useRef(false);
@@ -239,7 +271,13 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
     // Deploy path prefix (baseHref) of the portal, '' when hosted at the root.
     // All embed-path checks must use basePath + '/embed' (SPEC §2.3).
     const basePath = useMemo(() => safeBasePathOf(baseUrl), [baseUrl]);
-    const dark = config.theme === 'dark';
+    // `theme` defaults to 'system' (SPEC / protocol.ts), so testing only for 'dark' resolved
+    // every default-configured session to the LIGHT palette — a white full-screen overlay
+    // handing over to a form the web side had correctly painted dark, because the portal
+    // resolves 'system' against prefers-color-scheme. Resolve it the same way here.
+    const deviceScheme = useColorScheme();
+    const dark =
+      config.theme === 'dark' || (config.theme !== 'light' && deviceScheme === 'dark');
 
     const allowedOrigins = useMemo(() => {
       const set = new Set<string>();
@@ -418,6 +456,15 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
       return payload?.handled === true; // {handled:false} or timeout ⇒ native closes
     }, [requestReply]);
 
+    const requestDismiss = useCallback(async (): Promise<boolean> => {
+      if (destroyedRef.current || phaseRef.current !== 'ready' || !helloReceivedRef.current) {
+        return true; // nothing rendered yet — nothing to lose
+      }
+      const reply = await requestReply('dismissRequested');
+      const payload = reply?.payload as DismissStatePayload | undefined;
+      return payload?.dirty !== true; // no reply ⇒ assume clean rather than trap the user
+    }, [requestReply]);
+
     const destroy = useCallback(() => {
       if (destroyedRef.current) return;
       send('destroy'); // best-effort; web clears persisted auth regardless of ack
@@ -427,7 +474,8 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
     }, [send, clearHelloTimer, clearPending]);
 
     const handleExternal = useCallback(
-      (url: string) => {
+      (url: string, via: string = 'unknown') => {
+        logDev(`handleExternal via ${via}:`, url);
         const intercept = propsRef.current.onOpenExternal;
         if (intercept && intercept(url)) return;
         Linking.openURL(url).catch(() => logDev('failed to open external URL', url));
@@ -484,6 +532,9 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
         clearHelloTimer();
         const cfg = propsRef.current.config;
         const a = authRef.current;
+        // A blank token is not a credential. Omitting the key is the protocol's way of saying
+        // "anonymous", and the portal branches on the key's presence.
+        const auth = a?.token ? { token: a.token, branchId: a.branchId, user: a.user } : undefined;
         // SPEC §3: answer EVERY hello with init (idempotent; web applies latest).
         send(
           'init',
@@ -492,12 +543,46 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
             platform: 'react-native' as const,
             protocolVersion: BRIDGE_PROTOCOL_VERSION,
             configure: { locale: cfg.locale, theme: cfg.theme, fontScale: cfg.fontScale },
-            auth: { token: a.token, branchId: a.branchId, user: a.user },
+            ...(auth ? { auth } : {}),
+            // SPEC §4.1: host owns the form data plane when a handler is set.
+            formDelegation: !!propsRef.current.onFormOp,
           },
           envelope.id,
         );
       },
       [send, clearHelloTimer],
+    );
+
+    const handleFormOp = useCallback(
+      (envelope: BridgeEnvelope) => {
+        const payload = envelope.payload as FormOpRequestPayload | undefined;
+        const handler = propsRef.current.onFormOp;
+        const replyOp = (response: FormOpResponsePayload) => {
+          if (destroyedRef.current) return;
+          send('ack', response, envelope.id);
+        };
+        if (!handler || !payload?.op) {
+          replyOp({ ok: false, error: handler ? 'Malformed formOp request.' : 'Form delegation is not enabled on this host.' });
+          return;
+        }
+        handler(payload)
+          .then((body) => replyOp({ ok: true, body }))
+          .catch((error: unknown) => {
+            const status =
+              typeof (error as { status?: unknown })?.status === 'number'
+                ? ((error as { status: number }).status)
+                : undefined;
+            const message =
+              error instanceof Error
+                ? error.message
+                : typeof (error as { message?: unknown })?.message === 'string'
+                  ? ((error as { message: string }).message)
+                  : 'Form operation failed.';
+            logDev('formOp failed', payload.op, message);
+            replyOp({ ok: false, error: message, status });
+          });
+      },
+      [send, logDev],
     );
 
     const handlePortalLog = useCallback(
@@ -570,7 +655,7 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
             break;
           case 'openExternal': {
             const payload = envelope.payload as OpenExternalPayload | undefined;
-            if (payload?.url) handleExternal(payload.url);
+            if (payload?.url) handleExternal(payload.url, 'bridge:openExternal');
             break;
           }
           case 'downloadRequest': {
@@ -580,6 +665,9 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
           }
           case 'authExpired':
             handleAuthExpired(envelope.payload as AuthExpiredPayload | undefined);
+            break;
+          case 'formOp':
+            handleFormOp(envelope);
             break;
           case 'log':
             handlePortalLog(envelope.payload as LogPayload | undefined);
@@ -601,6 +689,7 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
         handleExternal,
         handleDownload,
         handleAuthExpired,
+        handleFormOp,
         handlePortalLog,
       ],
     );
@@ -618,8 +707,18 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
         return;
       }
       if (portalOrigin.startsWith('http://') && !isLocalhostOrigin(portalOrigin)) {
-        fail('loadFailed', 'Insecure baseUrl rejected: the portal must be served over HTTPS.');
-        return;
+        // DEV escape hatch: portal dev servers bound to a tenant hostname
+        // (backend derives the tenant from the request host/referer) may run
+        // plain http. Never honored in release builds.
+        if (__DEV__ && config.allowInsecureHttp === true) {
+          console.warn(
+            `[AmthalPortal] DEV: allowing insecure portal base URL ${portalOrigin} ` +
+              '(allowInsecureHttp) — release builds enforce HTTPS.',
+          );
+        } else {
+          fail('loadFailed', 'Insecure baseUrl rejected: the portal must be served over HTTPS.');
+          return;
+        }
       }
 
       const controller = new AbortController();
@@ -691,14 +790,18 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
     // -----------------------------------------------------------------------
 
     // auth prop changes → send `auth` (skip the initial value: it rides on init).
-    const prevAuthRef = useRef<PortalAuthState>(auth);
+    const prevAuthRef = useRef<PortalAuthState | undefined>(auth);
     useEffect(() => {
       const prev = prevAuthRef.current;
       prevAuthRef.current = auth;
       authRef.current = auth;
       const changed =
-        prev.token !== auth.token || prev.branchId !== auth.branchId || prev.user !== auth.user;
-      if (changed && helloReceivedRef.current && !destroyedRef.current) {
+        prev?.token !== auth?.token ||
+        prev?.branchId !== auth?.branchId ||
+        prev?.user !== auth?.user;
+      // Only a real credential is worth an `auth` message; going from one anonymous shape to
+      // another is not a session change.
+      if (changed && auth?.token && helloReceivedRef.current && !destroyedRef.current) {
         sendAuth(auth);
       }
     }, [auth, sendAuth]);
@@ -763,9 +866,10 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
         updateAuth: (next) => sendAuth(next),
         configure: (c) => sendConfigure(c),
         handleBackPress,
+        requestDismiss,
         destroy,
       }),
-      [sendAuth, sendConfigure, handleBackPress, destroy],
+      [sendAuth, sendConfigure, handleBackPress, requestDismiss, destroy],
     );
 
     // -----------------------------------------------------------------------
@@ -826,8 +930,24 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
       (req: ShouldStartLoadRequest): boolean => {
         const { url } = req;
         if (url === 'about:blank' || url.startsWith('about:')) return true;
-        // iOS reports subframe loads; only confine the main frame.
-        if (req.isTopFrame === false) return true;
+
+        // Only the MAIN frame is confined. A page legitimately loads third-party sub-frames
+        // (reCAPTCHA, payment widgets, embedded maps) and cancelling one of those hands a
+        // fragment of the page to the system browser — the user lands in Safari on
+        // `google.com/recaptcha/api2/anchor` and the form is left behind.
+        //
+        // Two signals, because neither is reliable alone: `isTopFrame` is typed as required but
+        // is absent on some platform/version combinations (and `undefined === false` is false,
+        // so the old single check silently fell through to confinement), while
+        // `mainDocumentURL` is iOS-only. A sub-frame is indicated by either one.
+        const mainDocumentUrl = (req as { mainDocumentURL?: string }).mainDocumentURL;
+        const isSubFrame =
+          req.isTopFrame === false ||
+          (typeof mainDocumentUrl === 'string' && mainDocumentUrl !== url);
+        if (isSubFrame) {
+          logDev('allowing sub-frame navigation', url);
+          return true;
+        }
 
         const origin = originOf(url);
         // SPEC §2.3 base path awareness: confine to basePath + /embed — never
@@ -839,7 +959,7 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
         }
         // SPEC §2.3: everything else is cancelled and surfaced as external.
         logDev('cancelled navigation outside the portal embed scope', url);
-        handleExternal(url);
+        handleExternal(url, 'shouldStartLoad');
         return false;
       },
       [isAllowedOrigin, basePath, handleExternal, logDev],
@@ -847,7 +967,7 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
 
     const handleOpenWindow = useCallback(
       (event: WebViewOpenWindowEvent) => {
-        handleExternal(event.nativeEvent.targetUrl);
+        handleExternal(event.nativeEvent.targetUrl, 'onOpenWindow');
       },
       [handleExternal],
     );
@@ -856,7 +976,14 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
     // Render
     // -----------------------------------------------------------------------
 
-    const palette = dark ? darkPalette : lightPalette;
+    const base = dark ? darkPalette : lightPalette;
+    // One place decides the accent, so the spinner, the retry button and anything added later
+    // cannot drift apart — and an unbranded host degrades to its own foreground rather than to
+    // somebody else's blue.
+    const palette = {
+      ...base,
+      accent: normalizeHexColor(config.brandColor) ?? base.accentFallback,
+    };
 
     if (phase === 'error' && error) {
       const errorView = renderError ? (
@@ -870,7 +997,11 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
             <Text style={[styles.errorDetail, { color: palette.subtext }]}>{error.message}</Text>
           ) : null}
           <Text style={[styles.errorCode, { color: palette.subtext }]}>({error.code})</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={retry} accessibilityRole="button">
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: palette.accent }]}
+            onPress={retry}
+            accessibilityRole="button"
+          >
             <Text style={styles.retryLabel}>Try again</Text>
           </TouchableOpacity>
         </View>
@@ -881,11 +1012,8 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
     const loadingView = renderLoading ? (
       renderLoading()
     ) : (
-      <View style={[styles.center, { backgroundColor: palette.background }]}>
-        <ActivityIndicator size="large" color={palette.accent} />
-      </View>
+      <PortalSplash brandColor={palette.accent} dark={dark} />
     );
-
     return (
       <View style={[styles.container, style]}>
         {phase !== 'manifest' && portalOrigin ? (
@@ -893,7 +1021,19 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
             key={attempt}
             ref={webviewRef}
             source={{ uri: sourceUri }}
-            originWhitelist={Array.from(allowedOrigins)}
+            // NOT the confinement boundary — `handleShouldStartLoad` below is.
+            //
+            // react-native-webview checks `originWhitelist` FIRST and, on a miss, hands the URL to
+            // Linking.openURL without ever calling our handler. That check does not distinguish the
+            // main frame from a sub-frame, so a narrow whitelist throws every third-party
+            // sub-resource at the system browser: loading a portal form flung the user into Safari
+            // on the reCAPTCHA iframe's google.com URL, and any analytics, font, map or payment
+            // frame would do the same.
+            //
+            // So we let every http(s) URL past this check and confine in our own handler, which
+            // knows about sub-frames and cancels (rather than externalises) an off-subtree main
+            // frame. `allowedOrigins` still governs there.
+            originWhitelist={['http://*', 'https://*']}
             style={[styles.webview, { backgroundColor: palette.background }]}
             // Bridge transport (SPEC §2)
             injectedJavaScriptBeforeContentLoaded={'window.__AMTHAL_EMBEDDED_RN__ = true; true;'}
@@ -950,12 +1090,30 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
   },
 );
 
+/**
+ * Accept `#rgb`, `#rrggbb` and `#rrggbbaa` and reject anything else.
+ *
+ * The value comes from a host app, and on Android an unparseable colour string throws deep
+ * inside the platform's colour processing rather than at the call site. Falling back to the
+ * surface foreground is always legible; crashing someone's app over a typo in a brand colour
+ * is not an acceptable trade.
+ */
+function normalizeHexColor(value: string | undefined | null): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const hex = value.trim();
+  return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(hex) ? hex : undefined;
+}
+
+// Neutral surfaces only. The accent is NOT defined here on purpose: this SDK ships to many
+// tenants under their own brand, so a literal accent would paint one company's colour inside
+// every other company's app. It comes from `PortalSdkConfig.brandColor`, and falls back to the
+// surface's own foreground rather than to a colour we invented.
 const lightPalette = {
   background: '#ffffff',
   scrim: 'rgba(255,255,255,0.88)',
   text: '#1a1a1a',
   subtext: '#6b7280',
-  accent: '#2563eb',
+  accentFallback: '#1a1a1a',
 };
 
 const darkPalette = {
@@ -963,7 +1121,7 @@ const darkPalette = {
   scrim: 'rgba(17,20,24,0.88)',
   text: '#f3f4f6',
   subtext: '#9ca3af',
-  accent: '#60a5fa',
+  accentFallback: '#f3f4f6',
 };
 
 const styles = StyleSheet.create({
@@ -1002,7 +1160,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#2563eb',
+    // backgroundColor is applied at the call site from the tenant's brand colour.
   },
   retryLabel: {
     color: '#ffffff',

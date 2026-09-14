@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: Bridge and wrappers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The wrappers resolve @amthal-group/portal-bridge from its dist, so the bridge has to
+      # be built before anything type-checks against it.
+      - run: npm run build
+      - run: npm run typecheck
+
+  ios:
+    name: iOS SDK
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      # NOT `swift build`: the package imports UIKit, so it must be built for an iOS
+      # destination. swift build targets the host and fails with "no such module 'UIKit'".
+      - run: xcodebuild -scheme AmthalPortal -destination 'generic/platform=iOS' build
+
+  android:
+    name: Android SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # AGP 8.7 refuses to run on JDK 11.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: ./gradlew :portal-sdk:assembleRelease --no-daemon
+        working-directory: android

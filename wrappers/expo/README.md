@@ -28,7 +28,7 @@ with the Expo glue into one Swift module; `BundleModuleShim.swift` supplies the
 import { presentPortalSheet } from '@amthal-group/portal-expo';
 
 const session = presentPortalSheet({
-  config: { baseUrl: 'https://host/portal', locale: 'en', theme: 'system' },
+  config: { baseUrl: 'https://portal.example.com/portal', locale: 'en', theme: 'system' },
   auth: { token, branchId },
   request: { kind: 'newApplication', type: 'external', productID: 42 },
   sheet: { detents: ['large', 'medium'], grabber: true },
@@ -39,4 +39,8 @@ const session = presentPortalSheet({
 });
 
 // session.updateAuth(...) / session.configure({ theme: 'dark' }) / session.dismiss()
+// DEV: config.allowInsecureHttp = true permits a plain-http baseUrl on a tenant
+// hostname (e.g. http://portal-dev.example.com:4200/portal — the backend resolves
+// the tenant from the request host/referer). DEBUG builds only; the host app
+// also needs an ATS exception for the dev domain.
 ```

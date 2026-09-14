@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.Network
@@ -210,6 +211,19 @@ class AmthalPortalView @JvmOverloads constructor(
     private fun beginLoad() {
         val config = config ?: return
         if (state == State.DESTROYED) return
+        // The DEV-only cleartext hatch counts only in a debuggable app, so a
+        // release build cannot be pointed at an http portal by one boolean in
+        // the embedding code. Checked here — the single funnel for the first
+        // load and every retry — so nothing leaves the device first.
+        if (!config.isBaseUrlTransportAllowed(context)) {
+            fail(
+                PortalError(
+                    PortalErrorCode.LOAD_FAILED,
+                    "Insecure baseUrl rejected: the portal must be served over https."
+                )
+            )
+            return
+        }
         hideError()
         showLoading()
         state = State.FETCHING_MANIFEST
@@ -497,8 +511,45 @@ class AmthalPortalView @JvmOverloads constructor(
         val container = FrameLayout(context)
         container.setBackgroundColor(themedBackgroundColor())
         val progress = ProgressBar(context)
+        // Only override the tint when the host actually gave us one. An untinted ProgressBar
+        // already picks up the host app's colorAccent, which is a better default than any
+        // colour we could pick — and it is what makes this the one overlay that was already
+        // accidentally on-brand.
+        config?.brandColor?.let { progress.indeterminateTintList = ColorStateList.valueOf(it) }
+
+        // `amthal_portal_loading` shipped translated (EN/AR) but unreferenced, so this
+        // overlay was the only one of the three platforms with no caption at all — a bare
+        // spinner reads as a stall rather than as progress. iOS and the RN wrapper both
+        // label their wait; say the same thing here.
+        val label = TextView(context).apply {
+            setText(R.string.amthal_portal_loading)
+            textAlignment = View.TEXT_ALIGNMENT_CENTER
+            setTextColor(themedSecondaryTextColor())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        }
+        val stack = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(
+                progress,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+            )
+            addView(
+                label,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(16)
+                }
+            )
+        }
         container.addView(
-            progress,
+            stack,
             LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, Gravity.CENTER)
         )
         addView(container, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -589,6 +640,26 @@ class AmthalPortalView @JvmOverloads constructor(
         } else {
             Color.WHITE
         }
+    }
+
+    /**
+     * Secondary label colour from the host's theme, so a caption drawn on
+     * [themedBackgroundColor] is legible in whichever mode the host is in. Falls back to a
+     * mid grey that reads on both — never to a fixed black, which vanishes on a dark host.
+     */
+    private fun themedSecondaryTextColor(): Int {
+        val tv = TypedValue()
+        val resolved = context.theme.resolveAttribute(android.R.attr.textColorSecondary, tv, true)
+        if (resolved && tv.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
+            tv.type <= TypedValue.TYPE_LAST_COLOR_INT
+        ) {
+            return tv.data
+        }
+        if (resolved && tv.resourceId != 0) {
+            @Suppress("DEPRECATION")
+            return resources.getColor(tv.resourceId, context.theme)
+        }
+        return Color.parseColor("#6B7280")
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

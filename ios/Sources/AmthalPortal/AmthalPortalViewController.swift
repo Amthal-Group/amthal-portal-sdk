@@ -267,7 +267,7 @@ public final class AmthalPortalViewController: UIViewController {
 
     private func showSkeleton() {
         if skeletonView == nil {
-            let skeleton = PortalSkeletonView()
+            let skeleton = PortalSkeletonView(brandColor: config.brandColor)
             skeleton.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(skeleton)
             pinToEdges(skeleton)

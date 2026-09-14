@@ -11,22 +11,27 @@ dependencies — Foundation, UIKit, WebKit, QuickLook, SafariServices only.
 
 ## Installation (Swift Package Manager)
 
-Xcode → *File ▸ Add Package Dependencies…* and point at this repository
-(subpath `ios/`), or in `Package.swift`:
+Xcode → *File ▸ Add Package Dependencies…* and paste the repository URL, or add
+it to your own `Package.swift`. SwiftPM reads the manifest at the repository
+root, which declares this target from `ios/Sources/AmthalPortal`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/amthal-group/portal-sdk.git", from: "1.0.0")
+    .package(url: "https://github.com/Amthal-Group/amthal-portal-sdk.git", from: "1.0.0")
 ],
 targets: [
     .target(
         name: "MyApp",
-        dependencies: [.product(name: "AmthalPortal", package: "portal-sdk")]
+        dependencies: [.product(name: "AmthalPortal", package: "amthal-portal-sdk")]
     )
 ]
 ```
 
-> When consuming the monorepo locally: `.package(path: "../portal-sdk/ios")`.
+> `from: "1.0.0"` resolves against the repository's git tags — a clone with no tags
+> yet has nothing to resolve, so use `branch: "main"` until the first release is tagged.
+>
+> When consuming the monorepo locally: `.package(path: "../portal-sdk/ios")`, which uses
+> the equivalent manifest kept in `ios/` so the SDK also opens standalone in Xcode.
 
 ## Quickstart — UIKit
 
@@ -40,7 +45,7 @@ let config = try PortalConfig(
     locale: .ar,                     // .en / .ar (drives portal locale + RTL)
     theme: .system,                  // .light / .dark / .system
     fontScale: 1.0,
-    minPortalVersion: "1.3.0",       // optional version-handshake floor
+    minPortalVersion: nil,           // optional floor — set it to the OLDEST portal you support
     enableLogging: false
 )
 

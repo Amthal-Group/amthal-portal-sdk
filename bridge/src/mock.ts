@@ -18,6 +18,9 @@ import {
   BRIDGE_PROTOCOL_VERSION,
   BridgeEnvelope,
   ConfigurePayload,
+  FormOpRequestPayload,
+  FormOpResponsePayload,
+  HostPlatform,
   InitPayload,
   NativeToWebType,
 } from './protocol';
@@ -26,8 +29,20 @@ export interface MockNativeHostOptions {
   auth: AuthPayload;
   configure?: ConfigurePayload;
   sdkVersion?: string;
+  /**
+   * Which host the mock impersonates, in `init.platform` AND in the transport hook it installs
+   * (default 'android'). The portal keys per-OS styling and templates off this, so a harness
+   * that can only be Android cannot exercise the iOS path at all.
+   */
+  platform?: HostPlatform;
   /** Auto-reply to `hello` with `init` (default true). */
   autoInit?: boolean;
+  /**
+   * Form delegation (SPEC §4.1): when set, `init` declares
+   * `formDelegation: true` and every `formOp` from the web is answered by
+   * this handler (resolve = `{ok:true, body}`, reject = `{ok:false, error}`).
+   */
+  onFormOp?: (request: FormOpRequestPayload) => Promise<unknown>;
 }
 
 export class MockNativeHost {
@@ -90,22 +105,66 @@ export class MockNativeHost {
     if (envelope.type === 'hello' && (this.options.autoInit ?? true)) {
       const payload: InitPayload = {
         sdkVersion: this.options.sdkVersion ?? 'mock-0.0.0',
-        platform: 'android',
+        platform: this.options.platform ?? 'android',
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
         configure: this.options.configure ?? {},
         auth: this.options.auth,
+        formDelegation: !!this.options.onFormOp,
       };
       this.send('init', payload, envelope.id);
+    }
+
+    if (envelope.type === 'formOp') {
+      const handler = this.options.onFormOp;
+      if (!handler) {
+        this.send(
+          'ack',
+          { ok: false, error: 'mock host: no onFormOp handler configured' } satisfies FormOpResponsePayload,
+          envelope.id
+        );
+        return;
+      }
+      handler(envelope.payload as FormOpRequestPayload)
+        .then((body) =>
+          this.send('ack', { ok: true, body } satisfies FormOpResponsePayload, envelope.id)
+        )
+        .catch((error: unknown) =>
+          this.send(
+            'ack',
+            {
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+              status: typeof (error as { status?: unknown })?.status === 'number'
+                ? (error as { status: number }).status
+                : undefined,
+            } satisfies FormOpResponsePayload,
+            envelope.id
+          )
+        );
     }
   }
 }
 
 /**
- * Installs the mock as if it were the Android transport. Must run before
- * createWebBridge() is first called (i.e. before Angular bootstraps).
+ * Installs the mock behind the transport hook of `options.platform` (default Android). Must run
+ * before createWebBridge() is first called (i.e. before Angular bootstraps), because the bridge
+ * detects its transport once.
  */
 export function installMockNativeHost(options: MockNativeHostOptions): MockNativeHost {
   const host = new MockNativeHost(options);
-  window.__amthalAndroid = { postMessage: (json: string) => host._receiveFromWeb(json) };
+  const post = (json: string) => host._receiveFromWeb(json);
+  const w = window as any;
+
+  switch (options.platform) {
+    case 'ios':
+      w.webkit = { ...(w.webkit ?? {}), messageHandlers: { ...(w.webkit?.messageHandlers ?? {}), amthal: { postMessage: post } } };
+      break;
+    case 'react-native':
+      w.__AMTHAL_EMBEDDED_RN__ = true;
+      w.ReactNativeWebView = { postMessage: post };
+      break;
+    default:
+      w.__amthalAndroid = { postMessage: post };
+  }
   return host;
 }

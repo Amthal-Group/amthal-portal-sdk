@@ -43,6 +43,20 @@ function toNativeAuth(auth: PortalAuthState): NativeAuth {
  * when the sheet closes.
  */
 export function presentPortalSheet(options: PresentPortalSheetOptions): PortalSheetSession {
+  // Form delegation is not wired through the native sheet yet (SPEC §4.1).
+  // Failing fast beats silently letting the portal hit its own endpoints
+  // with an identity that belongs on a different API plane.
+  if (options.onFormOp) {
+    queueMicrotask(() =>
+      options.onError?.({
+        code: 'loadFailed',
+        message:
+          'presentPortalSheet does not support form delegation (onFormOp) yet — use the inline AmthalPortalForm instead.',
+      }),
+    );
+    return { updateAuth: () => undefined, configure: () => undefined, dismiss: () => undefined };
+  }
+
   const subscriptions: Array<{ remove: () => void }> = [];
   let closed = false;
 

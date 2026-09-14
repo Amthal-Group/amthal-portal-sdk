@@ -1,0 +1,86 @@
+name: Bug report
+description: Something in the SDK does not behave as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, run the check that resolves most reports:
+
+        ```bash
+        curl -i "<your portalBaseUrl>/embed/manifest.json"
+        ```
+
+        A `200` with `content-type: application/json` means the portal is fine and the problem is
+        likely ours. HTML or a 404 means the portal is not deployed for embedding — that goes to
+        your Amthal contact, not here.
+
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: How are you integrating?
+      options:
+        - React Native wrapper (inline)
+        - Expo wrapper (native iOS sheet)
+        - iOS SDK directly (Swift)
+        - Android SDK directly (Kotlin)
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and version
+      placeholder: "iOS 18.2 simulator / Android 15 emulator / Pixel 8, Android 14"
+    validations:
+      required: true
+
+  - type: input
+    id: portal-version
+    attributes:
+      label: Portal version
+      description: The `portalVersion` field from your `/embed/manifest.json`.
+      placeholder: "1.8.0"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the form with type=… productID=…
+        2. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Your config
+      description: >
+        The `config` object you pass in, **with the token and any tenant hostname removed**.
+        The `baseUrl` shape matters — keep the path structure, redact the host if you need to.
+      render: json
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        With `enableLogging: true` (debug builds only) the SDK prints its bridge traffic.
+        Redact tokens before pasting.
+      render: shell

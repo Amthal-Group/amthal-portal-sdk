@@ -75,8 +75,14 @@ internal class DownloadHandler(
         conn.readTimeout = 30_000
         conn.requestMethod = "GET"
         conn.instanceFollowRedirects = true
-        for ((key, value) in headers) {
-            conn.setRequestProperty(key, value)
+        // Headers ride only to an allowed origin. `downloadRequest` carries
+        // whatever the web asked for, so an Authorization header sent to an
+        // off-origin host is a token handed away — DownloadHandler.swift makes
+        // the same check before attaching them.
+        if (config.isUrlOriginAllowed(url)) {
+            for ((key, value) in headers) {
+                conn.setRequestProperty(key, value)
+            }
         }
         try {
             conn.connect()

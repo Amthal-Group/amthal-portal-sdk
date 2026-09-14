@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: My portal is not set up yet
+    url: https://www.amthalgroup.com/contact
+    about: >
+      /embed 404s, the manifest is not JSON, your branch has no forms, or you have no portal URL
+      at all — that is a deployment question. Contact Amthal Group; nothing in this repo can fix it.
+  - name: Security vulnerability
+    url: https://github.com/Amthal-Group/amthal-portal-sdk/security/policy
+    about: Report privately to security@amthalgroup.com. Please do not open a public issue.
+  - name: Documentation
+    url: https://github.com/Amthal-Group/amthal-portal-sdk#readme
+    about: The README covers setup A–Z, the API reference, recipes and troubleshooting.

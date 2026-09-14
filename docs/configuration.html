@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuration — Amthal Portal SDK</title>
+<meta name="description" content="Every configuration option of the Amthal Portal SDK on React Native, Expo, iOS and Android: types, defaults, validation, runtime updates, and what the SDK does and does not theme.">
+<link rel="stylesheet" href="assets/css/site.css">
+<link rel="icon" href="assets/img/amthal-logo.svg" type="image/svg+xml">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="site-header__brand" href="./index.html">
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    </a>
+    <span class="site-header__title">Portal SDK</span>
+    <nav class="site-nav" aria-label="Documentation">
+      <ul>
+        <li><a href="./index.html">Overview</a></li>
+        <li><a href="./getting-started.html">Getting started</a></li>
+        <li><a href="./configuration.html" aria-current="page">Configuration</a></li>
+        <li><a href="./api-reference.html">API reference</a></li>
+        <li><a href="./bridge-protocol.html">Bridge protocol</a></li>
+        <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <div class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Reference</p>
+      <h1>Configuration</h1>
+      <p class="lede">
+        One object configures an embedded portal session on every platform: <code>PortalSdkConfig</code> in
+        JavaScript, <code>PortalConfig</code> in Swift and Kotlin. It says where the portal lives, how it
+        should present itself, and which development hatches are open.
+      </p>
+      <p>
+        Two rules are worth reading before the tables. <strong>Your <code>baseUrl</code> must include the
+        portal's deploy path prefix</strong> — omitting it is the single most common integration failure.
+        And <strong>the SDK does not theme the portal</strong>: a form's own colours and branding come from
+        the tenant's branch, server-side. What you configure here is the SDK's own screens, plus the three
+        appearance values the portal accepts.
+      </p>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+  <nav aria-label="On this page">
+    <h2 class="visually-hidden">On this page</h2>
+    <ul class="anchor-list">
+      <li><a href="#shapes">The config object, per platform</a></li>
+      <li><a href="#matrix">Option matrix<span class="muted">Which option exists where</span></a></li>
+      <li><a href="#baseurl">baseUrl<span class="muted">Required, and path-sensitive</span></a></li>
+      <li><a href="#appearance">locale, theme, fontScale</a></li>
+      <li><a href="#brandcolor">brandColor</a></li>
+      <li><a href="#minportalversion">minPortalVersion</a></li>
+      <li><a href="#allowedorigins">allowedOrigins</a></li>
+      <li><a href="#enablelogging">enableLogging</a></li>
+      <li><a href="#insecure">allowInsecureHttp<span class="muted">The development hatch</span></a></li>
+      <li><a href="#pinning">certificatePinner<span class="muted">Android only</span></a></li>
+      <li><a href="#runtime">Changing configuration at runtime</a></li>
+      <li><a href="#theming">Theming and branding</a></li>
+      <li><a href="#sheet">Expo sheet options</a></li>
+      <li><a href="#release">Before you ship</a></li>
+    </ul>
+  </nav>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="shapes">
+    <h2 class="rule-heading">The config object, per platform</h2>
+    <p>
+      Field names are deliberately the same across the four hosts, with two casing differences and two
+      fields that exist on some platforms only. Those exceptions are listed in the
+      <a href="#matrix">option matrix</a>; start from these four shapes.
+    </p>
+
+    <ul class="platform-tabs">
+      <li><a href="#cfg-rn">React Native</a></li>
+      <li><a href="#cfg-expo">Expo sheet</a></li>
+      <li><a href="#cfg-ios">iOS</a></li>
+      <li><a href="#cfg-android">Android</a></li>
+    </ul>
+
+    <h3 id="cfg-rn">React Native <span class="badge"><code>@amthal-group/portal-react-native</code></span></h3>
+<pre class="code" tabindex="0"><code>import { AmthalPortalForm } from '@amthal-group/portal-react-native';
+
+&lt;AmthalPortalForm
+  config={{
+    baseUrl: 'https://portal.example.com/portal',
+    locale: 'en',
+    theme: 'system',
+    fontScale: 1.0,
+    brandColor: '#121E4C',
+    minPortalVersion: '1.8.0',
+  }}
+  request={{ kind: 'newApplication', type: 'internal', productID: 3021 }}
+  auth={{ token, branchId: '12' }}
+  onSubmitted={handleSubmitted}
+  onCancelled={handleCancelled}
+  onError={handleError}
+  onCloseRequested={handleClose}
+/&gt;</code></pre>
+
+    <h3 id="cfg-expo">Expo native sheet <span class="badge"><code>@amthal-group/portal-expo</code></span> <span class="badge badge--accent">iOS only</span></h3>
+<pre class="code" tabindex="0"><code>import { presentPortalSheet } from '@amthal-group/portal-expo';
+
+const session = presentPortalSheet({
+  config: {
+    baseUrl: 'https://portal.example.com/portal',
+    locale: 'ar',
+    theme: 'system',
+    fontScale: 1.0,
+  },
+  auth: { token, branchId: '12' },
+  request: { kind: 'newApplication', type: 'internal', productID: 3021 },
+  sheet: { detents: ['large'], grabber: true },
+  onSubmitted: (result) =&gt; console.log(result.applicationNo),
+});</code></pre>
+
+    <h3 id="cfg-ios">iOS (Swift) <span class="badge"><code>AmthalPortal</code></span></h3>
+<pre class="code" tabindex="0"><code>import AmthalPortal
+
+let config = try PortalConfig(
+    baseURL: URL(string: "https://portal.example.com/portal")!,
+    locale: .en,
+    theme: .system,
+    fontScale: 1.0,
+    brandColor: UIColor(red: 0.07, green: 0.12, blue: 0.30, alpha: 1),
+    minPortalVersion: "1.8.0"
+)</code></pre>
+    <p>
+      <code>PortalConfig.init</code> is <code>throws</code> on iOS — the two errors it can throw are listed
+      under <a href="#baseurl">baseUrl</a>.
+    </p>
+
+    <h3 id="cfg-android">Android (Kotlin) <span class="badge"><code>com.amthalgroup:portal-sdk</code></span></h3>
+<pre class="code" tabindex="0"><code>import com.amthalgroup.portal.PortalConfig
+import com.amthalgroup.portal.PortalLocale
+import com.amthalgroup.portal.PortalTheme
+
+val config = PortalConfig(
+    baseUrl = "https://portal.example.com/portal",
+    locale = PortalLocale.EN,
+    theme = PortalTheme.SYSTEM,
+    fontScale = 1f,
+    brandColor = Color.parseColor("#121E4C"),
+    minPortalVersion = "1.8.0",
+)</code></pre>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="matrix">
+    <h2 class="rule-heading">Option matrix</h2>
+    <p>
+      Which option exists where, and under which name. Everything except <code>baseUrl</code> is optional on
+      every platform.
+    </p>
+
+    <div class="table-scroll">
+      <table class="table">
+        <caption>Availability and naming across the four hosts</caption>
+        <thead>
+          <tr>
+            <th scope="col">Option</th>
+            <th scope="col">React Native</th>
+            <th scope="col">Expo sheet</th>
+            <th scope="col">iOS</th>
+            <th scope="col">Android</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row"><code>baseUrl</code></th><td><code>baseUrl</code></td><td><code>baseUrl</code></td><td><code>baseURL</code> <span class="muted">(a <code>URL</code>)</span></td><td><code>baseUrl</code></td></tr>
+          <tr><th scope="row"><code>locale</code></th><td>Yes</td><td>Yes</td><td>Yes <span class="muted"><code>PortalLocale</code></span></td><td>Yes <span class="muted"><code>PortalLocale</code></span></td></tr>
+          <tr><th scope="row"><code>theme</code></th><td>Yes</td><td>Yes</td><td>Yes <span class="muted"><code>PortalTheme</code></span></td><td>Yes <span class="muted"><code>PortalTheme</code></span></td></tr>
+          <tr><th scope="row"><code>fontScale</code></th><td>Yes</td><td>Yes</td><td>Yes <span class="muted"><code>Double</code></span></td><td>Yes <span class="muted"><code>Float</code></span></td></tr>
+          <tr><th scope="row"><code>brandColor</code></th><td>Yes <span class="muted">hex string</span></td><td><strong>No</strong></td><td>Yes <span class="muted"><code>UIColor?</code></span></td><td>Yes <span class="muted"><code>@ColorInt Int?</code></span></td></tr>
+          <tr><th scope="row"><code>minPortalVersion</code></th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th scope="row"><code>allowedOrigins</code></th><td>Yes <span class="muted"><code>string[]</code></span></td><td>Yes <span class="muted"><code>string[]</code></span></td><td>Yes <span class="muted"><code>Set&lt;String&gt;?</code></span></td><td>Yes <span class="muted"><code>Set&lt;String&gt;</code></span></td></tr>
+          <tr><th scope="row"><code>enableLogging</code></th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th scope="row">Insecure-HTTP hatch</th><td class="nowrap"><code>allowInsecureHttp</code></td><td class="nowrap"><code>allowInsecureHttp</code></td><td class="nowrap"><code>allowInsecureHTTP</code></td><td class="nowrap"><code>allowInsecureHttp</code></td></tr>
+          <tr><th scope="row"><code>certificatePinner</code></th><td>No</td><td>No</td><td>No</td><td><strong>Only here</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout--warn">
+      <span class="callout__title">Two casing traps</span>
+      <p>
+        The insecure-HTTP flag is <code>allowInsecureHTTP</code> on iOS and <code>allowInsecureHttp</code>
+        everywhere else. On the auth object, the optional user payload is <code>user</code> in JavaScript,
+        <code>userJSON</code> in Swift and <code>userJson</code> in Kotlin. Neither split is a typo you can
+        fix by guessing — copy the spelling for the platform you are on.
+      </p>
+    </div>
+
+    <div class="callout">
+      <span class="callout__title">The Expo sheet has no brandColor</span>
+      <p>
+        The field is absent from the Expo config type and the native module never reads one, so the sheet's
+        loading interstitial always uses the platform default tint. If branding the wait matters to you, use
+        the inline React Native component, which does support it.
+      </p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="baseurl">
+    <h2 class="rule-heading">baseUrl — required, and it must carry the deploy path</h2>
+
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td>React Native, Expo, Android: <code>string</code>. iOS: <code>URL</code>.</td></tr>
+        <tr><th scope="row">Default</th><td>None — required.</td></tr>
+        <tr><th scope="row">Accepts</th><td><code>https://</code> always; <code>http://</code> for loopback hosts, or via the dev-only hatch.</td></tr>
+        <tr><th scope="row">Rejects</th><td>Credentials in the URL and a query string. Android also rejects a fragment, at construction time.</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      The Client Portal is deployed under a base href of <code>/portal/</code>, so a correct value almost
+      always ends in that prefix:
+    </p>
+
+<pre class="code" tabindex="0"><code>https://portal.example.com/portal       correct
+https://portal.example.com/portal/      correct — a trailing slash is tolerated
+https://portal.example.com              WRONG — the deploy path is missing
+https://portal.example.com/portal?x=1   WRONG — never a query string</code></pre>
+
+    <div class="callout callout--danger">
+      <span class="callout__title">Why the prefix is not optional</span>
+      <p>
+        The SDK computes the navigation boundary as <code>basePath + "/embed"</code>, where
+        <code>basePath</code> is the path component of your <code>baseUrl</code>. Drop the
+        <code>/portal</code> and every real portal URL looks like it sits outside the allowed subtree, so
+        the portal's very first in-app navigation is treated as an external link. The symptom is not an
+        error dialog — it is the user being thrown out of your app into Safari or Chrome on the first tap.
+      </p>
+    </div>
+
+    <p>The one check that settles it, before you write any code. This must return JSON, not HTML:</p>
+<pre class="code" tabindex="0"><code>curl -sI https://portal.example.com/portal/embed/manifest.json
+
+content-type: application/json   correct
+content-type: text/html          wrong — the SPA catch-all answered, so the path is wrong</code></pre>
+    <p>
+      A <code>text/html</code> answer means the manifest fetch will fail and the session ends in
+      <code>manifestFailed</code>. The manifest is always read from the full base URL plus
+      <code>/embed/manifest.json</code> — never from the bare origin, which is exactly why the prefix has
+      to be in the value you configure.
+    </p>
+
+    <h3>What an invalid base URL does, per platform</h3>
+    <table class="table">
+      <thead><tr><th scope="col">Platform</th><th scope="col">Behaviour</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">React Native</th>
+          <td>Nothing throws. An unparseable URL, or a cleartext URL in a release build, surfaces through
+          <code>onError</code> with code <code>loadFailed</code>.</td>
+        </tr>
+        <tr>
+          <th scope="row">iOS</th>
+          <td><code>PortalConfig.init</code> throws <code>PortalConfigError.invalidBaseURL(URL)</code> when
+          there is no usable scheme or host, and <code>PortalConfigError.insecureBaseURL(URL)</code> for
+          cleartext that is neither loopback nor a honoured dev hatch. Both are <code>LocalizedError</code>,
+          so <code>errorDescription</code> is printable.</td>
+        </tr>
+        <tr>
+          <th scope="row">Expo</th>
+          <td>The native side builds the same <code>PortalConfig</code>; a config error rejects the
+          presentation and reaches you through <code>onError</code> as <code>loadFailed</code>.</td>
+        </tr>
+        <tr>
+          <th scope="row">Android</th>
+          <td>The <code>PortalConfig</code> constructor throws <code>IllegalArgumentException</code> for a
+          missing scheme, a missing host, disallowed cleartext, <code>fontScale</code> that is not greater
+          than zero, or a <code>baseUrl</code> carrying a query or fragment. Android is the only platform
+          that rejects a query or fragment this early.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The loopback hosts accepted over plain HTTP differ slightly by platform: iOS allows
+      <code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code>, <code>[::1]</code> and any
+      <code>*.localhost</code> host; Android allows <code>localhost</code>, <code>127.0.0.1</code>,
+      <code>10.0.2.2</code> (the emulator's route to your machine) and <code>::1</code>; React Native allows
+      <code>localhost</code>, <code>127.0.0.1</code> and <code>10.0.2.2</code>.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="appearance">
+    <h2 class="rule-heading">locale, theme, fontScale — what the portal is told</h2>
+    <p>
+      These three are the only appearance values that cross the bridge. They are sent during the handshake
+      and can be re-sent at any time without reloading the form — see
+      <a href="#runtime">changing configuration at runtime</a>.
+    </p>
+
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr><th scope="col">Option</th><th scope="col">Type</th><th scope="col">Default</th><th scope="col">What it changes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row"><code>locale</code></th>
+            <td>JS <code>'en' | 'ar'</code><br>Swift <code>PortalLocale.en</code> / <code>.ar</code><br>Kotlin <code>PortalLocale.EN</code> / <code>.AR</code></td>
+            <td>React Native sends nothing when you omit it; the native hosts default to <code>en</code>.</td>
+            <td>Selects the portal's translations. <code>ar</code> additionally flips the document direction
+            to RTL, so there is no separate direction flag to set.</td>
+          </tr>
+          <tr>
+            <th scope="row"><code>theme</code></th>
+            <td><code>'light' | 'dark' | 'system'</code>, and the matching Swift and Kotlin enums</td>
+            <td><code>system</code></td>
+            <td>Sets the portal's light/dark mode, and also drives the SDK's own overlays. React Native
+            resolves <code>system</code> against the device colour scheme, so the splash matches the form it
+            is covering.</td>
+          </tr>
+          <tr>
+            <th scope="row"><code>fontScale</code></th>
+            <td>Number — Swift <code>Double</code>, Kotlin <code>Float</code></td>
+            <td><code>1.0</code>, the portal's own default size</td>
+            <td>The portal maps it to a root font-size adjustment. It must be greater than zero; Android
+            rejects anything else with <code>IllegalArgumentException</code>, both in the constructor and in
+            <code>updateConfigure</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The locale set is closed: <code>en</code> and <code>ar</code>. There is no mechanism for passing a
+      third language through the SDK — portal translations are a portal-side concern, and a value outside
+      that pair is not part of the protocol.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="brandcolor">
+    <h2 class="rule-heading">brandColor — your colour on the SDK's own screens</h2>
+
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td>React Native <code>string</code> (hex) · iOS <code>UIColor?</code> · Android <code>@ColorInt Int?</code> · not available on the Expo sheet</td></tr>
+        <tr><th scope="row">Default</th><td>Unset. The SDK draws with the surface's own foreground colour instead — deliberately plain, rather than substituting some other company's brand.</td></tr>
+        <tr><th scope="row">Scope</th><td>The SDK's loading and retry interstitials only. Never the portal's UI.</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      <code>brandColor</code> exists because of a timing fact: the loading screen is on the user's display
+      <em>before</em> the WebView can speak, so nothing the portal sends could colour the first frame. It is
+      the one piece of appearance that has to be configured natively instead of arriving over the bridge.
+    </p>
+
+    <h3>Accepted values</h3>
+    <p>
+      React Native accepts three hex forms only — <code>#rgb</code>, <code>#rrggbb</code> and
+      <code>#rrggbbaa</code>. Anything else is ignored and the default foreground is used instead. That is
+      deliberate: on Android an unparseable colour string throws deep inside the platform's colour
+      processing rather than at the call site, and crashing a host app over a typo in a brand colour is not
+      an acceptable trade. The cost is that a bad value fails quietly, so check that your colour actually
+      renders.
+    </p>
+<pre class="code" tabindex="0"><code>brandColor: '#121E4C'        accepted
+brandColor: '#12E'           accepted
+brandColor: '#121E4CCC'      accepted (with alpha)
+brandColor: 'navy'           ignored
+brandColor: 'rgb(18,30,76)'  ignored</code></pre>
+
+    <h3>What it tints, exactly</h3>
+    <table class="table">
+      <thead><tr><th scope="col">Platform</th><th scope="col">Tinted</th><th scope="col">Not tinted</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">React Native</th><td>The splash accent and the retry button</td><td>The portal's own UI</td></tr>
+        <tr><th scope="row">iOS</th><td>The loading spinner</td><td>The retry button, which is a stock filled system button</td></tr>
+        <tr><th scope="row">Android</th><td>The loading progress indicator's tint</td><td>The retry button</td></tr>
+        <tr><th scope="row">Expo sheet</th><td>Nothing — the option does not exist</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="minportalversion">
+    <h2 class="rule-heading">minPortalVersion — refuse a portal that is too old</h2>
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td>String, for example <code>"1.8.0"</code></td></tr>
+        <tr><th scope="row">Default</th><td>Unset — any portal version is accepted</td></tr>
+        <tr><th scope="row">On failure</th><td><code>versionIncompatible</code> through your error handler; the session does not load</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Before loading the page the SDK fetches <code>/embed/manifest.json</code> and applies three
+      independent gates. The manifest's <code>bridgeProtocolVersion</code> must equal <code>1</code>
+      exactly — a newer protocol is as incompatible as an older one. The manifest's
+      <code>portalVersion</code> must be at least your <code>minPortalVersion</code>. And the SDK's own
+      version must be at least the manifest's <code>minSdkVersion</code>, which is how a portal refuses an
+      app that is too old to talk to it. All three surface as the same code.
+    </p>
+    <p>
+      Set it to the oldest portal build you have actually tested against, and present
+      <code>versionIncompatible</code> in your UI as "please update the app" rather than as a retry — it is
+      the one error the SDK never auto-retries, because retrying cannot change the answer.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="allowedorigins">
+    <h2 class="rule-heading">allowedOrigins — extra hosts for main-frame navigation</h2>
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td>React Native and Expo <code>string[]</code> · iOS <code>Set&lt;String&gt;?</code> · Android <code>Set&lt;String&gt;</code></td></tr>
+        <tr><th scope="row">Default</th><td>The host of <code>baseUrl</code>, and nothing else</td></tr>
+        <tr><th scope="row">When you need it</th><td>Rarely — only when a portal deployment legitimately navigates the main frame to a second host</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The origin derived from <code>baseUrl</code> is always allowed; entries here are added to it. Android
+      accepts either a bare host or a full origin and normalises both to a lower-cased host with any port
+      stripped. iOS defaults the set to the base URL's host when you pass <code>nil</code>.
+    </p>
+    <p>
+      This is a navigation and bridge-traffic allow-list, not a content blocker: a URL outside it is not
+      loaded into a dead end, it is handed to your <code>onOpenExternal</code> handler, or to the system
+      browser if you have none. On React Native, note that the WebView's <code>originWhitelist</code> is
+      deliberately broad and is <em>not</em> the confinement boundary — <code>allowedOrigins</code> plus the
+      embed-subtree check is.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="enablelogging">
+    <h2 class="rule-heading">enableLogging — diagnostics, debug builds only</h2>
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td>Boolean</td></tr>
+        <tr><th scope="row">Default</th><td><code>false</code></td></tr>
+        <tr><th scope="row">Honoured in</th><td>React Native: only under <code>__DEV__</code>. iOS and Expo: only in <code>DEBUG</code> builds. Android: forwarded to Logcat, so keep it <code>false</code> in release.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      With it on, bridge <code>log</code> messages from the portal and WebView console output reach your
+      platform log. The build gate is not advisory: the protocol requires log messages to be dropped in
+      release builds and the SDK enforces that regardless of the flag, so shipping with it set to
+      <code>true</code> produces no output but does leave a reviewer-visible switch in your code. Drive it
+      from your own debug constant instead.
+    </p>
+    <p>
+      SDK diagnostics never include credentials or download header values. Keep that property in anything
+      you log on top of it — a bearer token on a log line is a bearer token in a crash report.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="insecure">
+    <h2 class="rule-heading">allowInsecureHttp — the development hatch</h2>
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td>Boolean (<code>allowInsecureHTTP</code> on iOS)</td></tr>
+        <tr><th scope="row">Default</th><td><code>false</code></td></tr>
+        <tr><th scope="row">Purpose</th><td>Permit a plain <code>http://</code> base URL for a host that is <em>not</em> loopback</td></tr>
+      </tbody>
+    </table>
+    <p>
+      You need this in exactly one situation: the portal dev server is bound to a tenant hostname — for
+      example <code>http://portal-dev.example.com:4200/portal</code> — because the backend resolves the
+      tenant from the request host. Loopback hosts already work over plain HTTP without any flag.
+    </p>
+    <p>
+      The hatch is build-gated everywhere, so a release binary cannot be talked into cleartext by one
+      boolean in the embedding code:
+    </p>
+    <table class="table">
+      <thead><tr><th scope="col">Platform</th><th scope="col">Gate</th><th scope="col">Release behaviour</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">React Native</th><td><code>__DEV__</code></td><td>Rejected with <code>loadFailed</code> and an "Insecure baseUrl rejected" message</td></tr>
+        <tr><th scope="row">iOS</th><td><code>#if DEBUG</code></td><td>The flag is dropped, so the config throws <code>PortalConfigError.insecureBaseURL</code></td></tr>
+        <tr><th scope="row">Expo</th><td><code>#if DEBUG</code> in the native module</td><td>Forced to <code>false</code> while the config is parsed</td></tr>
+        <tr><th scope="row">Android</th><td>The app's <code>FLAG_DEBUGGABLE</code></td><td>Ignored, with a warning in Logcat, and the load is refused</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout--warn">
+      <span class="callout__title">The flag alone is not enough</span>
+      <p>
+        The platform still has to permit cleartext. On iOS, add an App Transport Security exception for the
+        dev domain to <code>Info.plist</code> (or <code>ios.infoPlist</code> in an Expo config). On Android,
+        add a scoped <code>network_security_config</code> in the debug source set for that host. Neither
+        belongs in a release configuration.
+      </p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="pinning">
+    <h2 class="rule-heading">certificatePinner — Android only</h2>
+<pre class="code" tabindex="0"><code>val config = PortalConfig(
+    baseUrl = "https://portal.example.com/portal",
+    certificatePinner = { leaf -&gt; myPinSet.contains(fingerprintOf(leaf)) },
+)</code></pre>
+    <table class="table">
+      <tbody>
+        <tr><th scope="row">Type</th><td><code>((X509Certificate) -&gt; Boolean)?</code></td></tr>
+        <tr><th scope="row">Default</th><td><code>null</code> — no pinning</td></tr>
+        <tr><th scope="row">Covers</th><td>SDK-initiated HTTPS only: the manifest fetch and downloads</td></tr>
+        <tr><th scope="row">Does not cover</th><td>The portal page load itself</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout--warn">
+      <span class="callout__title">Know the coverage gap before you rely on it</span>
+      <p>
+        The hook is invoked with the server's leaf certificate; return <code>false</code> to abort the
+        connection. The page load, however, goes through the system WebView network stack, which exposes no
+        pinning hook — so this cannot give you full coverage on its own. If you need that, pin at the
+        network edge. There is no equivalent option on React Native, Expo or iOS.
+      </p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="runtime">
+    <h2 class="rule-heading">Changing configuration at runtime</h2>
+    <p>
+      <code>locale</code>, <code>theme</code> and <code>fontScale</code> can be re-applied to a live
+      session — a user switching language in your settings screen should not tear their half-filled form
+      down. Everything else (<code>baseUrl</code>, <code>brandColor</code>,
+      <code>minPortalVersion</code>, <code>allowedOrigins</code>, the security flags) is fixed for the life
+      of a session; to change one of those, end the session and start a new one.
+    </p>
+
+    <table class="table">
+      <thead><tr><th scope="col">Platform</th><th scope="col">Call</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">React Native</th><td><code>ref.current?.configure({ locale: 'ar', theme: 'dark', fontScale: 1.2 })</code></td></tr>
+        <tr><th scope="row">Expo sheet</th><td><code>session.configure({ locale: 'ar' })</code></td></tr>
+        <tr><th scope="row">iOS (UIKit)</th><td><code>controller.updateConfigure(locale: .ar, theme: .dark, fontScale: 1.2)</code> — every argument is optional</td></tr>
+        <tr><th scope="row">iOS (SwiftUI)</th><td>Nothing to call. <code>AmthalPortalView</code> diffs <code>config.locale</code>, <code>config.theme</code> and <code>config.fontScale</code> across updates and forwards the changes for you.</td></tr>
+        <tr><th scope="row">Android</th><td><code>view.updateConfigure(...)</code> or <code>fragment.updateConfigure(...)</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <span class="callout__title">Two Android constraints</span>
+      <p>
+        <code>PortalFormActivity</code> exposes <code>updateAuth</code> but no
+        <code>updateConfigure</code> — if you need to re-theme a live session, host the form with
+        <code>PortalFormFragment</code> or <code>AmthalPortalView</code>. And
+        <code>AmthalPortalView.start(...)</code> may be called <strong>once</strong> per view instance; a
+        second call fails an internal state check, so create a new view for a new session.
+      </p>
+    </div>
+
+    <p>
+      Credentials follow the same pattern through a separate call — <code>updateAuth</code> on every
+      platform, or the <code>refresh</code> function handed to React Native's <code>onAuthExpired</code>.
+      The <a href="./api-reference.html">API reference</a> covers auth in full; the
+      configuration-adjacent fact is that credentials travel over the bridge only, never in a URL, which is
+      why there is no token field in any config object on this page.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="theming">
+    <h2 class="rule-heading">Theming and branding</h2>
+
+    <div class="callout callout--warn">
+      <span class="callout__title">What the SDK does not control</span>
+      <p>
+        <strong>The SDK does not theme the portal.</strong> A form's colours, logo, typography and layout
+        come from the Client Portal itself, which is themed server-side per branch. No SDK option repaints a
+        form, and none is planned: a host app that could restyle the portal could make one tenant's forms
+        look like another's. What you configure here is the SDK's own screens, plus the three appearance
+        values the portal accepts — <code>locale</code>, <code>theme</code> and <code>fontScale</code>.
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table class="table">
+        <caption>Who owns each visible surface</caption>
+        <thead><tr><th scope="col">Surface</th><th scope="col">Owned by</th><th scope="col">You change it with</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Loading splash</th><td>SDK</td><td><code>brandColor</code>, or <code>renderLoading</code> on React Native</td></tr>
+          <tr><th scope="row">Error and retry interstitial</th><td>SDK</td><td><code>renderError</code> on React Native; <code>brandColor</code> partially elsewhere</td></tr>
+          <tr><th scope="row">Session-expired overlay</th><td>SDK</td><td>Not configurable — it clears when you supply a fresh token</td></tr>
+          <tr><th scope="row">Sheet chrome (Expo and iOS)</th><td>SDK and platform</td><td><code>PortalSheetOptions</code> — detents, grabber, corner radius</td></tr>
+          <tr><th scope="row">The form itself</th><td><strong>Portal, server-side per branch</strong></td><td>Branch branding in the back office — not the SDK</td></tr>
+          <tr><th scope="row">Form language and direction</th><td>Portal</td><td><code>locale</code></td></tr>
+          <tr><th scope="row">Form light/dark and text size</th><td>Portal</td><td><code>theme</code>, <code>fontScale</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure class="shot">
+      <span class="shot__frame">
+        <img src="assets/screenshots/ios-splash.png" width="1206" height="2622" loading="lazy"
+             alt="The Portal SDK loading splash on iPhone: a soft brand-coloured wash behind the host app's logo, with a slim indeterminate progress track and a short caption beneath it.">
+      </span>
+      <figcaption>
+        <strong>The default splash, iOS</strong>
+        Shown here with a host logo and a brand colour supplied. It covers the manifest fetch, the page load
+        and the bridge handshake, and lifts only when the portal reports that it is ready.
+      </figcaption>
+    </figure>
+
+    <h3>Replacing the loading screen on React Native</h3>
+    <p>
+      <code>renderLoading</code> takes the wait over completely. Rather than rebuilding one, reuse the SDK's
+      own splash — it is a public export — and give it your logo:
+    </p>
+<pre class="code" tabindex="0"><code>import { AmthalPortalForm, PortalSplash } from '@amthal-group/portal-react-native';
+import { Image, useColorScheme } from 'react-native';
+
+const dark = useColorScheme() === 'dark';
+
+&lt;AmthalPortalForm
+  config={{ baseUrl: 'https://portal.example.com/portal', brandColor: '#121E4C' }}
+  renderLoading={() =&gt; (
+    &lt;PortalSplash
+      brandColor="#121E4C"
+      dark={dark}
+      title="Tasleeh"
+      logo={&lt;Image source={require('./assets/logo.png')} style={{ width: 120, height: 40 }} /&gt;}
+    /&gt;
+  )}
+  /* …the rest of the props… */
+/&gt;</code></pre>
+
+    <div class="table-scroll">
+      <table class="table">
+        <caption><code>PortalSplashProps</code></caption>
+        <thead><tr><th scope="col">Prop</th><th scope="col">Type</th><th scope="col">Default</th><th scope="col">Notes</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>brandColor</code></th><td><code>ColorValue</code></td><td>Unset</td><td>Omit it for a deliberately plain, unbranded wait.</td></tr>
+          <tr><th scope="row"><code>logo</code></th><td><code>React.ReactNode</code></td><td>Unset</td><td>Your own logo, already laid out. Passing one replaces the animated beacon — the two are exclusive on purpose, because a logo and an animated mark on the same screen compete.</td></tr>
+          <tr><th scope="row"><code>dark</code></th><td><code>boolean</code></td><td><code>false</code></td><td>The resolved theme. Turn <code>'system'</code> into a real value yourself, for example with <code>useColorScheme()</code>.</td></tr>
+          <tr><th scope="row"><code>title</code></th><td><code>string</code></td><td>Unset</td><td>Shown under the mark; usually the tenant's company name.</td></tr>
+          <tr><th scope="row"><code>caption</code></th><td><code>string</code></td><td>The SDK's own caption</td><td>The default caption changes after eight seconds to acknowledge a slow wait. Supplying your own replaces both.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The SDK never fetches or guesses a logo. A host app has its logo as a local asset, while the portal's
+      is a server-side value whose fallback is Amthal's own mark — the wrong mark to show inside someone
+      else's app. Pass yours, or accept the unbranded default.
+    </p>
+    <p>
+      The splash also honours the device's reduce-motion setting and drops its animation for users who have
+      asked for that. If you replace it with a screen of your own, keep that behaviour.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="sheet">
+    <h2 class="rule-heading">Expo sheet presentation options</h2>
+    <p>
+      The Expo wrapper presents the portal in a native iOS sheet, configured separately from
+      <code>PortalSdkConfig</code> through <code>PortalSheetOptions</code>.
+    </p>
+    <div class="table-scroll">
+      <table class="table">
+        <thead><tr><th scope="col">Option</th><th scope="col">Type</th><th scope="col">Default</th><th scope="col">Effect</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>detents</code></th><td><code>Array&lt;'large' | 'medium'&gt;</code></td><td><code>['large']</code> when absent or empty</td><td>The heights the sheet may rest at. When both are offered, it opens at <code>large</code>.</td></tr>
+          <tr><th scope="row"><code>grabber</code></th><td><code>boolean</code></td><td><code>true</code></td><td>Shows the grab handle at the top of the sheet.</td></tr>
+          <tr><th scope="row"><code>cornerRadius</code></th><td><code>number</code></td><td>Platform default</td><td>Corner radius of the sheet card.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Two behaviours are fixed and not configurable: the sheet is presented as a page sheet, and scrolling
+      to the edge of the content does not expand it to the next detent — a form that grows as the user types
+      should not resize the sheet under their finger.
+    </p>
+    <div class="callout">
+      <p>
+        The Expo module is Apple-only, and both wrapper paths contain native code, so neither can run in
+        Expo Go — use a development build. Form delegation is also unsupported on this path: supplying an
+        <code>onFormOp</code> handler makes <code>presentPortalSheet</code> fail fast through
+        <code>onError</code> rather than silently letting the portal call its own endpoints with the wrong
+        identity. Use the inline React Native component for delegated forms.
+      </p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- -->
+  <section id="release">
+    <h2 class="rule-heading">Before you ship</h2>
+    <ol class="seq">
+      <li class="seq__row">
+        <h3>Base URL carries the deploy path</h3>
+        <p>Confirm with <code>curl -sI {baseUrl}/embed/manifest.json</code> against the production portal,
+        not only against staging — the two are deployed independently.</p>
+      </li>
+      <li class="seq__row">
+        <h3>No development hatches in the release configuration</h3>
+        <p>Remove <code>allowInsecureHttp</code> / <code>allowInsecureHTTP</code>, the ATS exception and the
+        Android cleartext config. They are inert at runtime, but they are a review finding.</p>
+      </li>
+      <li class="seq__row">
+        <h3>enableLogging comes from your debug constant</h3>
+        <p>Never a hardcoded <code>true</code>, and never anything of your own that logs a token.</p>
+      </li>
+      <li class="seq__row">
+        <h3>minPortalVersion is set</h3>
+        <p>To the oldest portal you have tested, with your UI presenting <code>versionIncompatible</code> as
+        "please update the app" instead of offering a retry that cannot succeed.</p>
+      </li>
+      <li class="seq__row">
+        <h3>brandColor is a value the SDK accepts</h3>
+        <p><code>#rgb</code>, <code>#rrggbb</code> or <code>#rrggbbaa</code>. Look at the splash once: an
+        invalid value is ignored rather than reported.</p>
+      </li>
+      <li class="seq__row">
+        <h3>Both locales open cleanly</h3>
+        <p>Launch a form with <code>locale: 'ar'</code> at least once and confirm the layout mirrors — RTL
+        is where a host app's own surrounding chrome usually breaks first.</p>
+      </li>
+    </ol>
+    <p>
+      Next: the <a href="./api-reference.html">API reference</a> for the component, handle and listener
+      surfaces, or <a href="./troubleshooting.html">Troubleshooting</a> for what each error code means and
+      which configuration mistake produces it.
+    </p>
+  </section>
+
+  </div><!-- /.wrap -->
+</main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    <p>
+      The Amthal Portal SDK embeds Client Portal forms natively in iOS, Android, React Native and Expo
+      apps, over Bridge Protocol v1.
+    </p>
+    <ul class="site-footer__links">
+      <li><a href="https://github.com/Amthal-Group/amthal-portal-sdk">GitHub repository</a></li>
+      <li><a href="./getting-started.html">Getting started</a></li>
+      <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+    </ul>
+  </div>
+</footer>
+
+</body>
+</html>

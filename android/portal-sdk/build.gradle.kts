@@ -63,7 +63,7 @@ afterEvaluate {
                 name = "GitHubPackages"
                 url = uri(
                     System.getenv("GITHUB_MAVEN_URL")
-                        ?: "https://maven.pkg.github.com/amthal-group/portal-sdk"
+                        ?: "https://maven.pkg.github.com/Amthal-Group/amthal-portal-sdk"
                 )
                 credentials {
                     username = System.getenv("GITHUB_ACTOR") ?: ""

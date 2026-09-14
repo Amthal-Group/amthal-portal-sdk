@@ -37,7 +37,10 @@ interface AmthalPortalListener {
      */
     fun onOpenExternal(url: String): Boolean = false
 
-    /** Informational: the portal navigated within `/embed/*`. */
+    // Do not write the embed route as a glob here: Kotlin nests block comments, so a `/*`
+    // inside KDoc opens a second one and the trailing `*/` closes only that — silently
+    // swallowing the rest of the interface.
+    /** Informational: the portal navigated within its `/embed` routes. */
     fun onNavigate(path: String, title: String?) {}
 
     /**

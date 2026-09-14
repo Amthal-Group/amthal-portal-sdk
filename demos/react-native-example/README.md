@@ -12,17 +12,25 @@ Flow: **Login** (mock) → **Home** (pick a demo form) → **Form** (`AmthalPort
 
 ## Run it
 
-This example ships JS/TS only; generate the native projects once, then run:
+This example ships JS/TS only — its `ios/` and `android/` projects are generated rather
+than committed, so they can never drift out of step with the React Native version in
+`package.json`. `npm run prebuild` creates them from the official template.
 
 ```sh
+# 1. Build the bridge first. The wrapper imports values from it at runtime, and its
+#    `main` (dist/index.js) does not exist in a fresh clone.
+npm run build:bridge --prefix ../..
+
+# 2. Install, then generate the native projects (once; add --force to regenerate).
 npm install
+npm run prebuild
 
-# iOS
+# 3. iOS
 cd ios && pod install && cd ..
-npx react-native run-ios
+npm run ios
 
-# Android
-npx react-native run-android
+# 3. Android
+npm run android
 ```
 
 > The wrapper and the bridge are linked via `file:` — `metro.config.js` already adds them to `watchFolders`, so edits to the SDK hot-reload into the app.

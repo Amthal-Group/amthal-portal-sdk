@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amthal Portal SDK — Overview</title>
+<meta name="description" content="Embed the Amthal Client Portal and its form engine inside your own iOS, Android, React Native or Expo app. Bridge protocol v1, SDK 1.0.0.">
+<link rel="icon" href="assets/img/amthal-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="site-header__brand" href="./index.html">
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group">
+      <span class="site-header__title">Portal SDK</span>
+    </a>
+    <nav class="site-nav" aria-label="Documentation">
+      <ul>
+        <li><a href="./index.html" aria-current="page">Overview</a></li>
+        <li><a href="./getting-started.html">Getting Started</a></li>
+        <li><a href="./configuration.html">Configuration</a></li>
+        <li><a href="./api-reference.html">API Reference</a></li>
+        <li><a href="./bridge-protocol.html">Bridge Protocol</a></li>
+        <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <div class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Amthal Portal Embed SDK</span>
+      <h1>Put the Client Portal inside your own app</h1>
+      <p class="lede">
+        The Amthal Portal SDK embeds the Client Portal — and every form your tenant has published
+        in it — as a native screen in your iOS, Android, React Native or Expo app: your app owns the
+        chrome, the session and the navigation, while the portal keeps rendering, validating and
+        submitting the forms.
+      </p>
+
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="./getting-started.html">Get started</a>
+        <a class="btn btn--ghost" href="#platforms">See the platform matrix</a>
+      </div>
+
+      <ul class="badge-row">
+        <li><span class="badge badge--navy">SDK <code>1.0.0</code></span></li>
+        <li><span class="badge badge--accent">Bridge protocol <code>v1</code></span></li>
+        <li><span class="badge">iOS 15+ &middot; Android 7.0+ (minSdk&nbsp;24)</span></li>
+        <li><span class="badge">React Native &ge;&nbsp;0.72</span></li>
+        <li><span class="badge">Developed against portal <code>1.8.0</code></span></li>
+        <li><span class="badge">MIT</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ================================================================= -->
+    <section aria-labelledby="shots">
+      <h2 id="shots" class="rule-heading">What your users actually see</h2>
+      <p>
+        These are real captures from a shipping app. Nothing in them is a browser: no address bar, no
+        page chrome, no zoom. The form draws edge to edge, the action bar is pinned to the safe area,
+        and the loading state is your brand colour from the very first frame — before the web view has
+        had a chance to say anything.
+      </p>
+
+      <ul class="shot-grid">
+        <li>
+          <figure class="shot">
+            <span class="shot__frame">
+              <img src="assets/screenshots/ios-form.png" width="1206" height="2622"
+                   alt="iPhone screen showing a single-step Amthal portal form rendered edge to edge, with a Submit button pinned above the home indicator.">
+            </span>
+            <figcaption><strong>iOS &mdash; single-step form</strong>
+              Rendered edge to edge with the submit action pinned to the safe area.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <figure class="shot">
+            <span class="shot__frame">
+              <img src="assets/screenshots/ios-splash.png" width="1206" height="2622"
+                   alt="iPhone screen showing the Portal SDK loading splash: a brand-coloured wash behind the host application's logo.">
+            </span>
+            <figcaption><strong>iOS &mdash; the SDK's own splash</strong>
+              Shown while the manifest handshake runs. Tinted by <code>brandColor</code>; replaceable
+              on React Native via <code>renderLoading</code>.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <figure class="shot">
+            <span class="shot__frame">
+              <img src="assets/screenshots/android-form.png" width="1080" height="2400"
+                   alt="Android screen showing a three-step Amthal portal form with Previous and Submit buttons pinned to the bottom of the screen.">
+            </span>
+            <figcaption><strong>Android &mdash; multi-step form</strong>
+              Hardware back is routed through the bridge, so the form steps backwards instead of
+              closing.</figcaption>
+          </figure>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ================================================================= -->
+    <section aria-labelledby="why">
+      <h2 id="why" class="rule-heading">Why it is built this way</h2>
+      <p>
+        Forms in the Optimum platform are configuration, not code: a tenant adds a field, reorders a
+        step or publishes a whole new application type, and it must be live for customers the same
+        day. Shipping that through an app-store release cycle is not workable. So the SDK splits the
+        problem in three, and each piece does only what it is best at.
+      </p>
+
+      <ul class="card-grid">
+        <li>
+          <article class="card">
+            <h3>A native shell</h3>
+            <p>
+              Your app owns presentation, the session and the back stack. The SDK gives you a view
+              (React Native, Android), a view controller (iOS) or a modal sheet (Expo) — plus the
+              things a web view cannot do for itself: loading and error interstitials, hardware-back
+              handling, an unsaved-changes guard, authenticated downloads and file uploads.
+            </p>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <h3>A web form engine</h3>
+            <p>
+              The Client Portal renders the form from the tenant's DMS catalogue and submits it to the
+              Optimum Core API. Add a field in the back office and it appears in your app on the next
+              open, with no release. The portal is themed server-side from the branch, so the form
+              already looks like the tenant it belongs to.
+            </p>
+          </article>
+        </li>
+        <li>
+          <article class="card">
+            <h3>One bridge</h3>
+            <p>
+              Between them sits <strong>Amthal Bridge Protocol&nbsp;v1</strong> — a small, versioned,
+              JSON message contract. Every host implements exactly the same messages, so behaviour is
+              identical across the four runtimes except where the capability matrix below says
+              otherwise. Credentials travel over that bridge, never in a URL.
+            </p>
+          </article>
+        </li>
+      </ul>
+
+      <h3>The consequences worth knowing up front</h3>
+      <ul>
+        <li>
+          <strong>The SDK never closes itself on submit.</strong> When a submission succeeds you get
+          <code>onSubmitted</code> / <code>formSubmitted</code> with the product id and the
+          application number; what happens next — a confirmation screen, a pop, a second form — is
+          your decision.
+        </li>
+        <li>
+          <strong>Navigation is confined.</strong> Main-frame navigation is allowed only inside
+          <code>basePath + /embed</code>. Anything outside that subtree is handed to your
+          <code>openExternal</code> hook, or opened outside the web view.
+        </li>
+        <li>
+          <strong>The version handshake is strict.</strong> Before the form is shown, the SDK fetches
+          <code>/embed/manifest.json</code> and refuses to continue if the portal speaks a different
+          bridge protocol version, is older than your <code>minPortalVersion</code>, or is newer than
+          the SDK build it is talking to.
+        </li>
+      </ul>
+    </section>
+
+    <!-- ================================================================= -->
+    <section aria-labelledby="platforms">
+      <h2 id="platforms" class="rule-heading">Platforms</h2>
+      <p>
+        Four hosts, one protocol. Pick the row that matches your app; the entry point column is the
+        single symbol you need to find in the <a href="./api-reference.html">API Reference</a>.
+      </p>
+
+      <div class="table-scroll">
+        <table class="table">
+          <caption>Artifacts and entry points, verified against the repository at SDK 1.0.0.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Host</th>
+              <th scope="col">Artifact</th>
+              <th scope="col">Entry point</th>
+              <th scope="col">Requirements</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">React&nbsp;Native <span class="muted">(inline)</span></th>
+              <td><code>@amthal-group/portal-react-native</code><br><small class="muted">npm, GitHub Packages</small></td>
+              <td><code>&lt;AmthalPortalForm/&gt;</code><br><small class="muted">+ <code>AmthalPortalFormHandle</code></small></td>
+              <td>React &ge; 18, React Native &ge; 0.72,<br><code>react-native-webview</code> &ge; 13</td>
+            </tr>
+            <tr>
+              <th scope="row">Expo <span class="muted">(native sheet)</span></th>
+              <td><code>@amthal-group/portal-expo</code><br><small class="muted">npm, GitHub Packages</small></td>
+              <td><code>presentPortalSheet(options)</code></td>
+              <td><strong>iOS only</strong> — the module declares
+                  <code>platforms: ["apple"]</code>. Pod targets iOS 15.1. Needs a prebuild or dev
+                  client; Expo Go cannot work.</td>
+            </tr>
+            <tr>
+              <th scope="row">iOS <span class="muted">(native)</span></th>
+              <td>Swift package <code>AmthalPortal</code><br><small class="muted">SwiftPM, this repository</small></td>
+              <td><code>AmthalPortalViewController</code><br><small class="muted">or <code>AmthalPortalView</code> for SwiftUI</small></td>
+              <td>iOS 15+, Swift 5.9. No release tag exists yet — resolve the package by
+                  <code>branch: "main"</code>.</td>
+            </tr>
+            <tr>
+              <th scope="row">Android <span class="muted">(native)</span></th>
+              <td><code>com.amthalgroup:portal-sdk:1.0.0</code><br><small class="muted">Maven, GitHub Packages</small></td>
+              <td><code>PortalFormActivity</code>, <code>PortalFormFragment</code><br><small class="muted">or <code>AmthalPortalView</code></small></td>
+              <td><code>minSdk</code> 24, <code>compileSdk</code> 35, JVM target 17</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Honest differences</h3>
+      <p>
+        Everything not listed here behaves identically on all four hosts: the version handshake and
+        error interstitials, auth handoff and <code>authExpired</code> recovery, navigation
+        confinement, runtime <code>configure</code> of locale, theme and font scale, and file uploads
+        from the form.
+      </p>
+
+      <div class="table-scroll">
+        <table class="table">
+          <caption>Capability differences between the four hosts.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Capability</th>
+              <th scope="col" class="center">RN inline</th>
+              <th scope="col" class="center">Expo sheet</th>
+              <th scope="col" class="center">Native iOS</th>
+              <th scope="col" class="center">Native Android</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Form delegation (<code>formOp</code>) — your app owns the data plane</th>
+              <td class="center yes">Yes</td>
+              <td class="center no">No <small class="muted">(fails fast)</small></td>
+              <td class="center no">No</td>
+              <td class="center no">No</td>
+            </tr>
+            <tr>
+              <th scope="row">Custom loading / error UI</th>
+              <td class="center yes"><code>renderLoading</code> / <code>renderError</code></td>
+              <td class="center no">Native chrome</td>
+              <td class="center no">Native chrome</td>
+              <td class="center no">Native chrome</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>brandColor</code> on the SDK's own interstitials</th>
+              <td class="center yes">Splash + retry button</td>
+              <td class="center no">Not available</td>
+              <td class="center yes">Loading spinner</td>
+              <td class="center yes">Loading progress tint</td>
+            </tr>
+            <tr>
+              <th scope="row">Haptics (<code>haptic</code> message)</th>
+              <td class="center no">Ignored</td>
+              <td class="center yes">Yes</td>
+              <td class="center yes">Yes</td>
+              <td class="center no">Ignored</td>
+            </tr>
+            <tr>
+              <th scope="row">Certificate-pinning hook</th>
+              <td class="center no">No</td>
+              <td class="center no">No</td>
+              <td class="center no">No</td>
+              <td class="center yes"><code>certificatePinner</code></td>
+            </tr>
+            <tr>
+              <th scope="row">Auto-retry when connectivity returns</th>
+              <td class="center no">Manual retry UI</td>
+              <td class="center yes">Yes</td>
+              <td class="center yes">Yes</td>
+              <td class="center yes">Yes</td>
+            </tr>
+            <tr>
+              <th scope="row">Hardware back &rarr; <code>backPressed</code> round-trip</th>
+              <td class="center yes">Yes <small class="muted">(needs <code>onCloseRequested</code>)</small></td>
+              <td class="center muted">n/a</td>
+              <td class="center yes"><code>performBack()</code></td>
+              <td class="center yes">Yes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="callout__title">Form delegation is React-Native-only today</span>
+        <p>
+          If your app must own the network calls the form makes — because you proxy them, sign them,
+          or run them through your own offline queue — use the inline
+          <code>&lt;AmthalPortalForm/&gt;</code> and its <code>onFormOp</code> prop. The native iOS
+          and Android hosts do not implement <code>formOp</code>; the Expo sheet rejects the option
+          immediately rather than silently ignoring it.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section aria-labelledby="quickstart">
+      <h2 id="quickstart" class="rule-heading">Sixty-second quickstart</h2>
+      <p>
+        This is the React Native path, the most used one. It assumes you already have the two values
+        only Amthal can give you: a portal base URL and a <code>productID</code>. If you do not,
+        <a href="./getting-started.html">Getting Started</a> walks through obtaining every one of them.
+      </p>
+
+      <span class="code-label">Terminal</span>
+<pre class="code"><code>npm install @amthal-group/portal-react-native react-native-webview
+cd ios &amp;&amp; pod install</code></pre>
+
+      <span class="code-label">ServiceRequestScreen.tsx</span>
+<pre class="code"><code>import { AmthalPortalForm } from '@amthal-group/portal-react-native';
+
+&lt;AmthalPortalForm
+  style={{ flex: 1 }}
+  config={{ baseUrl: 'https://portal.example.com/portal', locale: 'en', theme: 'system' }}
+  // Omit `auth` entirely for the anonymous plane. Never pass { token: '' }.
+  auth={{ token, branchId: '12' }}
+  request={{ kind: 'newApplication', type: 'internal', productID: 41 }}
+  onSubmitted={(result) =&gt; showReceipt(result.applicationNo)}
+  onCancelled={close}
+  // Required, or the Android hardware-back handler is never installed.
+  onCloseRequested={close}
+  onError={(error) =&gt; reportProblem(error.code, error.message)}
+/&gt;</code></pre>
+
+      <p>
+        Three callbacks are required by the type (<code>onSubmitted</code>,
+        <code>onCancelled</code>, <code>onError</code>) and a fourth,
+        <code>onCloseRequested</code>, is required in practice: without it the wrapper installs no
+        Android back handler at all, and the hardware back button closes your screen mid-form.
+        Everything else — refresh-on-expiry, downloads, external links, a custom splash — is opt-in
+        and covered in the <a href="./api-reference.html">API Reference</a>.
+      </p>
+
+      <div class="callout callout--warn">
+        <span class="callout__title">The base URL must include the portal's deploy path prefix</span>
+        <p>
+          The Client Portal ships with <code>&lt;base href="/portal/"&gt;</code>, so the correct value
+          is <code>https://portal.example.com/portal</code> — not
+          <code>https://portal.example.com</code>. Navigation confinement is computed as
+          <code>basePath + /embed</code>, so dropping the prefix makes the portal's very first
+          navigation look like it left the subtree, and the user is thrown into the system browser.
+          It is the single most common integration mistake. Confirm it with one command:
+          <code>curl -s {baseUrl}/embed/manifest.json</code> must return JSON, not HTML.
+        </p>
+      </div>
+
+      <div class="callout callout--danger">
+        <span class="callout__title">Two values that fail silently when they are wrong</span>
+        <p>
+          <strong><code>type</code> must be the literal string <code>'internal'</code></strong> for a
+          signed-in submission. A signed-in user opened with any other value submits successfully
+          down the public plane, and the application never appears in their history — no error
+          anywhere.
+        </p>
+        <p class="mb-0">
+          <strong>For an anonymous session, omit <code>auth</code> entirely.</strong> Passing
+          <code>{ token: '' }</code> is not the same thing: an absent <code>auth</code> key is how the
+          portal is told it is on the public plane and made to drop stored credentials.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <section aria-labelledby="lifecycle">
+      <h2 id="lifecycle" class="rule-heading">What happens when a form opens</h2>
+      <p>
+        Worth reading once: almost every support question is really a question about which of these
+        five steps did not complete.
+      </p>
+
+      <ol class="seq">
+        <li class="seq__row">
+          <div>
+            <h3>The SDK fetches the manifest</h3>
+            <p>
+              <code>GET {baseUrl}/embed/manifest.json</code> — always relative to the full base URL,
+              never to the bare origin. It carries <code>portalVersion</code>,
+              <code>bridgeProtocolVersion</code> and an optional <code>minSdkVersion</code>. Failure
+              here is <code>manifestFailed</code>; a version mismatch is
+              <code>versionIncompatible</code>.
+            </p>
+          </div>
+        </li>
+        <li class="seq__row">
+          <div>
+            <h3>The web view loads the embed route</h3>
+            <p>
+              Your <code>request</code> is turned into a path under <code>/embed</code> — for a new
+              application, <code>/embed/form/{type}/{productID}</code>. The SDK's loading
+              interstitial is on screen throughout.
+            </p>
+          </div>
+        </li>
+        <li class="seq__row">
+          <div>
+            <h3>The portal says <code>hello</code>, the host replies <code>init</code></h3>
+            <p>
+              <code>init</code> is where the credentials, locale, theme and font scale cross — over
+              the bridge, never in the URL. If no <code>hello</code> arrives within 15 seconds of the
+              page loading, you get <code>bridgeTimeout</code>.
+            </p>
+          </div>
+        </li>
+        <li class="seq__row">
+          <div>
+            <h3>The portal says <code>ready</code></h3>
+            <p>
+              Angular has booted, the credentials have been applied and the first embed route has
+              resolved. This is the moment the SDK hides its skeleton and your
+              <code>onReady</code> fires — exactly once per page load.
+            </p>
+          </div>
+        </li>
+        <li class="seq__row">
+          <div>
+            <h3>The user submits &mdash; and you decide what happens next</h3>
+            <p>
+              <code>formSubmitted</code> carries <code>productID</code> and, where the portal returns
+              one, <code>applicationNo</code>, <code>batchID</code> and <code>headerID</code>. The SDK
+              does not dismiss itself. If the session expired mid-form instead, you get
+              <code>authExpired</code>, the form pauses, and it resumes the moment you hand back a
+              fresh token.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <p>
+        The messages, payload shapes and the normative timings are documented in full on the
+        <a href="./bridge-protocol.html">Bridge Protocol</a> page; every error code and what actually
+        triggers it is on <a href="./troubleshooting.html">Troubleshooting</a>.
+      </p>
+    </section>
+
+    <!-- ================================================================= -->
+    <section aria-labelledby="next">
+      <h2 id="next" class="rule-heading">Where to go next</h2>
+
+      <ul class="card-grid">
+        <li>
+          <a class="card" href="./getting-started.html">
+            <h3>Getting Started</h3>
+            <p>
+              The A&ndash;Z for a brand-new integration: the GitHub token for
+              <code>@amthal-group/*</code>, installing for your runtime, and where the portal URL,
+              <code>branchId</code> and <code>productID</code> values come from — in order, with the
+              command that verifies each one.
+            </p>
+            <span class="card__meta">Start here if this is day one.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="./configuration.html">
+            <h3>Configuration</h3>
+            <p>
+              Every field of <code>PortalConfig</code> / <code>PortalSdkConfig</code> on all four
+              hosts, with defaults, validation rules and the per-platform differences —
+              <code>brandColor</code>, <code>minPortalVersion</code>, <code>allowedOrigins</code>,
+              and the development-only HTTP hatch.
+            </p>
+            <span class="card__meta">Including the casing splits between platforms.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="./api-reference.html">
+            <h3>API Reference</h3>
+            <p>
+              Exact signatures: the React Native props and imperative handle, the Expo sheet session,
+              the iOS view controller and its delegate, the Android activity, fragment, view and
+              listener — plus the request and auth shapes each of them takes.
+            </p>
+            <span class="card__meta">The page to keep open while you build.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="./bridge-protocol.html">
+            <h3>Bridge Protocol</h3>
+            <p>
+              Protocol v1 in full: the envelope, every message in both directions, the transport
+              probe order, form delegation, the manifest, and the normative timings. Read it if you
+              are writing a new host or delegating the form data plane.
+            </p>
+            <span class="card__meta">Normative. Spec PR first, then code.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="./troubleshooting.html">
+            <h3>Troubleshooting</h3>
+            <p>
+              The eight <code>PortalErrorCode</code> values and what really triggers each one on each
+              platform, the silent failures that produce no error at all, and how to smoke-test the
+              bridge in a desktop browser before you build an app at all.
+            </p>
+            <span class="card__meta">Read the base-URL entry first.</span>
+          </a>
+        </li>
+        <li>
+          <a class="card" href="https://github.com/Amthal-Group/amthal-portal-sdk">
+            <h3>The repository</h3>
+            <p>
+              Source for all four hosts, the bridge package and its normative
+              <code>SPEC.md</code>, the runnable demo apps, and the long-form README this site is
+              distilled from.
+            </p>
+            <span class="card__meta">github.com/Amthal-Group/amthal-portal-sdk</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <div>
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group">
+    </div>
+    <div>
+      <p>
+        Amthal Portal SDK 1.0.0 — Bridge Protocol v1. Documentation for the SDK that embeds the
+        Amthal Client Portal in native and hybrid mobile applications.
+      </p>
+      <ul class="site-footer__links">
+        <li><a href="https://github.com/Amthal-Group/amthal-portal-sdk">Source on GitHub</a></li>
+        <li><a href="./getting-started.html">Getting Started</a></li>
+        <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

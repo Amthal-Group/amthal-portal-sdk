@@ -174,6 +174,13 @@ public final class AmthalPortalNativeModule: Module {
         let minPortalVersion = dict["minPortalVersion"] as? String
         let allowedOrigins = (dict["allowedOrigins"] as? [String]).map(Set.init)
         let enableLogging = dict["enableLogging"] as? Bool ?? false
+        // DEV-only escape hatch: forwarded to PortalConfig only in DEBUG
+        // builds — release builds always enforce HTTPS.
+        #if DEBUG
+        let allowInsecureHTTP = dict["allowInsecureHttp"] as? Bool ?? false
+        #else
+        let allowInsecureHTTP = false
+        #endif
 
         return try PortalConfig(
             baseURL: baseURL,
@@ -182,7 +189,8 @@ public final class AmthalPortalNativeModule: Module {
             fontScale: fontScale,
             minPortalVersion: minPortalVersion,
             allowedOrigins: allowedOrigins,
-            enableLogging: enableLogging
+            enableLogging: enableLogging,
+            allowInsecureHTTP: allowInsecureHTTP
         )
     }
 

@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Getting started — Amthal Portal SDK</title>
+<meta name="description" content="From nothing to a rendered Amthal form: what Amthal provisions for you, registry access, install per platform, the baseUrl rule, a minimal working snippet for React Native, Expo, iOS and Android, and how to verify it worked." />
+<link rel="icon" href="assets/img/amthal-logo.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="assets/css/site.css" />
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="site-header__brand" href="./index.html">
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34" />
+      <span class="site-header__product">Portal SDK</span>
+    </a>
+    <nav class="site-nav" aria-label="Documentation">
+      <ul>
+        <li><a href="./index.html">Overview</a></li>
+        <li><a href="./getting-started.html" aria-current="page">Getting started</a></li>
+        <li><a href="./configuration.html">Configuration</a></li>
+        <li><a href="./api-reference.html">API reference</a></li>
+        <li><a href="./bridge-protocol.html">Bridge protocol</a></li>
+        <li><a href="./troubleshooting.html">Troubleshooting</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+  <div class="hero">
+    <p class="badge">Integration guide</p>
+    <h1>Getting started</h1>
+    <p class="hero__lede">
+      This page takes you from an empty project to a real Amthal form rendering inside your app.
+      It is written to be followable end to end without asking anyone a question — every value you
+      need is either something Amthal hands you once, or something you can read off the API yourself
+      with a <code>curl</code> command printed below.
+    </p>
+    <p>
+      Budget about half an hour on a project that already builds. Roughly two thirds of that is
+      getting registry access and your first token; the SDK integration itself is one component and
+      three callbacks.
+    </p>
+  </div>
+
+  <nav class="anchor-list" aria-label="On this page">
+    <h2 id="on-this-page">On this page</h2>
+    <ul>
+      <li><a href="#what-you-are-building">What you are building</a></li>
+      <li><a href="#prerequisites">1 — Prerequisites: Amthal's side and yours</a></li>
+      <li><a href="#registry">2 — Access the package registry</a></li>
+      <li><a href="#install">3 — Install for your platform</a></li>
+      <li><a href="#base-url">4 — Set <code>baseUrl</code> (read this one twice)</a></li>
+      <li><a href="#branch">5 — Find your <code>branchId</code></a></li>
+      <li><a href="#token">6 — Obtain a token</a></li>
+      <li><a href="#form">7 — Choose <code>type</code> and <code>productID</code></a></li>
+      <li><a href="#snippets">8 — A minimal working screen</a></li>
+      <li><a href="#verify">9 — Run it and verify</a></li>
+      <li><a href="#dev-http">10 — Developing against a plain-HTTP portal</a></li>
+      <li><a href="#before-you-ship">11 — Before you ship</a></li>
+    </ul>
+  </nav>
+
+  <section aria-labelledby="what-you-are-building">
+    <h2 id="what-you-are-building">What you are building</h2>
+    <p>
+      The Amthal Portal SDK embeds the Amthal Client Portal — including its form builder — inside
+      your own mobile app. Your app owns the login, the navigation and the screen around it; the SDK
+      owns a hardened WebView pointed at the portal's <code>/embed/*</code> routes, and a small
+      message bridge that carries credentials, locale, theme and lifecycle events between the two.
+      The user never sees a browser, never logs in twice, and the form they fill is the same form the
+      portal serves on the web, themed for your tenant.
+    </p>
+    <p>
+      Four packages exist, one per host runtime. They are interchangeable in behaviour, not in code
+      shape — pick the one that matches your app and ignore the rest.
+    </p>
+
+    <div class="card-grid">
+      <article class="card">
+        <h3>React Native (inline)</h3>
+        <p><code>@amthal-group/portal-react-native</code></p>
+        <p>
+          A pure-TypeScript component over <code>react-native-webview</code>. Renders inline, so you
+          can put it inside your own screen, tab or modal. This is the only host that supports form
+          delegation.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Expo (native sheet, iOS only)</h3>
+        <p><code>@amthal-group/portal-expo</code></p>
+        <p>
+          Presents the native iOS SDK in a <code>UISheetPresentationController</code> from JavaScript.
+          Its module declares Apple as its only platform — on Android, use the React Native wrapper.
+        </p>
+      </article>
+      <article class="card">
+        <h3>iOS (Swift)</h3>
+        <p>SwiftPM library <code>AmthalPortal</code></p>
+        <p>
+          A <code>UIViewController</code> plus a SwiftUI wrapper. iOS 15 and up. Added by Git URL or
+          as a local package.
+        </p>
+      </article>
+      <article class="card">
+        <h3>Android (Kotlin)</h3>
+        <p><code>com.amthalgroup:portal-sdk</code></p>
+        <p>
+          An <code>Activity</code>, a <code>Fragment</code> and a bare <code>FrameLayout</code> view.
+          <code>minSdk 24</code>, <code>compileSdk 35</code>, JVM target 17.
+        </p>
+      </article>
+    </div>
+
+    <p>
+      All four speak the same wire protocol — <strong>Amthal Bridge Protocol v1</strong> — and all
+      four ship as version <strong>1.0.0</strong>. The protocol version is compared for
+      <em>strict equality</em> against the portal's manifest, so an SDK and a portal either agree or
+      the SDK refuses to load; there is no partial-compatibility mode.
+    </p>
+
+    <div class="seq">
+      <div class="seq__row">
+        <strong>1. Your app authenticates</strong>
+        <span>Your own login screen, against the Optimum Core API. You keep the token.</span>
+      </div>
+      <div class="seq__row">
+        <strong>2. You open the SDK</strong>
+        <span>Hand it <code>baseUrl</code>, the token, the <code>branchId</code> and which form to show.</span>
+      </div>
+      <div class="seq__row">
+        <strong>3. The SDK checks the portal</strong>
+        <span>Fetches <code>/embed/manifest.json</code> and compares protocol and version floors before showing anything.</span>
+      </div>
+      <div class="seq__row">
+        <strong>4. The bridge handshakes</strong>
+        <span>The portal sends <code>hello</code>, the SDK replies <code>init</code> with your credentials and locale/theme.</span>
+      </div>
+      <div class="seq__row">
+        <strong>5. The form renders</strong>
+        <span>The portal sends <code>ready</code>, the SDK hides its splash, and your user is on the form.</span>
+      </div>
+      <div class="seq__row">
+        <strong>6. Submission comes back to you</strong>
+        <span><code>onSubmitted</code> fires with the application number. <strong>The SDK never auto-closes</strong> — what happens next is your decision.</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="prerequisites">
+    <h2 id="prerequisites">1 — Prerequisites: Amthal's side and yours</h2>
+    <p>
+      Five values have to exist before any code can work. Three of them only Amthal can give you;
+      two you can read off the API once you have the first three. Collect all five before you start
+      — every one of them has a failure mode that looks like a bug in the SDK.
+    </p>
+
+    <h3>What Amthal provisions for you</h3>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Value</th><th scope="col">What it is</th><th scope="col">How to confirm it is right</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Portal base URL</th>
+          <td>
+            The deployed Client Portal, <strong>including its deploy path prefix</strong>. The portal
+            ships with <code>&lt;base href="/portal/"&gt;</code>, so a typical value is
+            <code>https://portal.example.com/portal</code>.
+          </td>
+          <td><code>curl -s {baseUrl}/embed/manifest.json</code> returns JSON, not HTML.</td>
+        </tr>
+        <tr>
+          <th scope="row">API base URL</th>
+          <td>
+            The Optimum Core API host that the portal itself talks to. Your login and token-refresh
+            calls go here. It is <em>not</em> the same host as the portal.
+          </td>
+          <td><code>POST {api}/Portal/Authentication/Authenticate</code> answers.</td>
+        </tr>
+        <tr>
+          <th scope="row">A test customer login</th>
+          <td>A real customer/contact account on the branch you are integrating.</td>
+          <td>It returns a token from <code>Authenticate</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>What you work out yourself</h3>
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Value</th><th scope="col">What it is</th><th scope="col">Where it comes from</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><code>branchId</code></th>
+          <td>The tenant/organisation whose forms, workflow and branding apply. A numeric id, passed as a string.</td>
+          <td><a href="#branch">Step 5</a> — one anonymous GET.</td>
+        </tr>
+        <tr>
+          <th scope="row"><code>productID</code></th>
+          <td>The id of the specific form in the DMS catalogue.</td>
+          <td><a href="#form">Step 7</a> — one catalogue GET.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      You also need a GitHub personal access token to install the packages
+      (<a href="#registry">step 2</a>). That one is yours to create, not Amthal's to issue.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>The SDK never shows a login screen.</strong> It has no account UI, no password field
+        and no session of its own. Authentication stays entirely in your app: you obtain a token
+        however you already do, and hand it over the bridge. This is deliberate — credentials never
+        travel in a URL, and your app keeps one identity rather than two.
+      </p>
+    </div>
+  </section>
+
+  <section aria-labelledby="registry">
+    <h2 id="registry">2 — Access the package registry</h2>
+    <p>
+      The <code>@amthal-group/*</code> npm packages and the Android artifact are published to
+      <strong>GitHub Packages</strong>, which requires authentication even for reads. Create a GitHub
+      personal access token (classic) with the <strong><code>read:packages</code></strong> scope —
+      no other scope is needed, and a token with more scope than that is a liability in a build
+      machine's home directory.
+    </p>
+
+    <h3>npm — React Native and Expo</h3>
+    <p>Put these two lines in your user-wide <code>~/.npmrc</code>, never in the repository:</p>
+<pre class="code"><code>@amthal-group:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code></pre>
+    <p>Verify before going further:</p>
+<pre class="code"><code>npm view @amthal-group/portal-react-native version
+# → 1.0.0</code></pre>
+    <p>
+      A <code>401 Unauthorized</code> here means the token is missing, expired, or lacks
+      <code>read:packages</code> — nothing after this step will work until that command prints a
+      version. In CI, inject the token as a secret and write the same two lines at build time.
+    </p>
+
+    <h3>Gradle — native Android</h3>
+    <p>
+      The same token, supplied to Gradle as <code>gpr.user</code> / <code>gpr.key</code> in
+      <code>~/.gradle/gradle.properties</code>. Never commit them.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>Working from a checkout of the SDK monorepo instead?</strong> You need no token at
+        all. <code>npm install</code> at the repository root resolves the wrappers through npm
+        workspaces; run <code>npm run build</code> once to build the bridge package, then depend on
+        the wrapper by path. <code>npm run typecheck</code> type-checks all three JS workspaces.
+      </p>
+    </div>
+  </section>
+
+  <section aria-labelledby="install">
+    <h2 id="install">3 — Install for your platform</h2>
+
+    <nav class="platform-tabs" aria-label="Jump to a platform">
+      <a href="#install-rn">React Native</a>
+      <a href="#install-expo">Expo</a>
+      <a href="#install-ios">iOS</a>
+      <a href="#install-android">Android</a>
+    </nav>
+
+    <h3 id="install-rn">React Native (inline)</h3>
+<pre class="code"><code>npm install @amthal-group/portal-react-native react-native-webview
+cd ios &amp;&amp; pod install</code></pre>
+    <p>
+      Peer dependencies: <code>react</code> ≥ 18, <code>react-native</code> ≥ 0.72,
+      <code>react-native-webview</code> ≥ 13. The wrapper itself is pure TypeScript and contains no
+      native code — the pod install is for the WebView.
+    </p>
+
+    <h3 id="install-expo">Expo (native iOS sheet)</h3>
+<pre class="code"><code>npm install @amthal-group/portal-expo
+npx expo prebuild
+npx expo run:ios</code></pre>
+    <p>
+      Peers: <code>expo</code>, <code>expo-modules-core</code>, <code>react</code> ≥ 18,
+      <code>react-native</code> ≥ 0.72. The pod targets iOS 15.1 and Swift 5.9.
+    </p>
+    <div class="callout callout--warn">
+      <p>
+        <strong>Expo Go cannot run either wrapper.</strong> Both paths involve native code — the
+        WebView in one, an Expo module with a Swift pod in the other — so you need a development
+        build. And note that the Expo module declares <code>"platforms": ["apple"]</code>: there is
+        no Android sheet. An Expo app that must work on both platforms uses
+        <code>@amthal-group/portal-react-native</code> for Android.
+      </p>
+    </div>
+
+    <h3 id="install-ios">iOS (Swift Package Manager)</h3>
+    <p>
+      A <code>Package.swift</code> at the repository root declares the library
+      <strong><code>AmthalPortal</code></strong>, so SwiftPM resolves the SDK straight from the Git
+      URL. In Xcode: <em>File ▸ Add Package Dependencies…</em> and paste the repository URL. Or, in
+      your own manifest:
+    </p>
+<pre class="code"><code>dependencies: [
+    // No release has been tagged yet — track the branch until the first tag exists.
+    .package(url: "https://github.com/Amthal-Group/amthal-portal-sdk.git", branch: "main")
+    // local checkout instead:
+    // .package(path: "../portal-sdk/ios")
+],
+targets: [
+    .target(name: "MyApp", dependencies: [.product(name: "AmthalPortal", package: "amthal-portal-sdk")])
+]</code></pre>
+    <div class="callout callout--warn">
+      <p>
+        <strong><code>from: "1.0.0"</code> will not resolve today.</strong> SwiftPM version
+        requirements match against Git tags, and this repository has no release tag yet. Use
+        <code>branch: "main"</code> until the first tag is cut, then switch to a version requirement.
+        With the local-path form (<code>ios/</code>, which carries an equivalent manifest so the SDK
+        also opens standalone in Xcode) the package name is <code>AmthalPortal</code>, not
+        <code>portal-sdk</code>.
+      </p>
+    </div>
+    <p>Both manifests target <code>swift-tools-version: 5.9</code> and <code>.iOS(.v15)</code>.</p>
+
+    <h3 id="install-android">Android (Gradle)</h3>
+<pre class="code"><code>// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url = uri("https://maven.pkg.github.com/Amthal-Group/amthal-portal-sdk")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+
+// app/build.gradle.kts
+dependencies {
+    implementation("com.amthalgroup:portal-sdk:1.0.0")
+}</code></pre>
+    <p>
+      Building the library from a checkout instead works from a clean clone with no local Gradle
+      install: the wrapper is committed and pinned to Gradle 8.9 with a distribution checksum.
+    </p>
+<pre class="code"><code>cd android
+./gradlew :portal-sdk:assembleRelease
+# → android/portal-sdk/build/outputs/aar/</code></pre>
+  </section>
+
+  <section aria-labelledby="base-url">
+    <h2 id="base-url">4 — Set <code>baseUrl</code> (read this one twice)</h2>
+
+    <div class="callout callout--danger">
+      <p>
+        <strong>This is the single most common integration mistake, and it does not look like a
+        configuration error when it happens.</strong> <code>baseUrl</code> must be the
+        <strong>full</strong> base URL of the portal deployment, <strong>including its deploy path
+        prefix</strong>. The Amthal Client Portal ships with
+        <code>&lt;base href="/portal/"&gt;</code>, so on a typical deployment the correct value ends
+        in <code>/portal</code>.
+      </p>
+    </div>
+
+    <table class="table">
+      <thead><tr><th scope="col">Value</th><th scope="col">Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><code>https://portal.example.com/portal</code></td><td>✅ correct</td></tr>
+        <tr><td><code>https://portal.example.com/portal/</code></td><td>✅ a trailing slash is tolerated and stripped</td></tr>
+        <tr><td><code>https://portal.example.com</code></td><td>❌ drops the prefix — see below</td></tr>
+        <tr><td><code>https://portal.example.com/portal?x=1</code></td><td>❌ never a query string; the Android constructor throws outright</td></tr>
+        <tr><td><code>http://portal.example.com/portal</code></td><td>❌ HTTPS is mandatory outside loopback (<a href="#dev-http">step 10</a>)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Why dropping the prefix breaks everything, quietly</h3>
+    <p>
+      Every host computes the navigation subtree it will allow as
+      <code>basePath&nbsp;+&nbsp;"/embed"</code> — never a literal <code>/embed</code>. Give it
+      <code>https://portal.example.com</code> and <code>basePath</code> is empty, so the SDK believes
+      only <code>/embed/*</code> is in-bounds. The portal actually serves
+      <code>/portal/embed/*</code>. The very first in-app navigation therefore looks
+      <em>off-subtree</em>, the WebView cancels it, and the URL is handed to the system browser —
+      your user is thrown out of your app into Safari or Chrome on a page they cannot log in to.
+      Nothing in the error callbacks fires, because from the SDK's point of view it did its job.
+    </p>
+
+    <h3>Verify it — the check that catches most broken integrations</h3>
+<pre class="code"><code>curl -sI https://portal.example.com/portal/embed/manifest.json | grep -i '^content-type'
+# → content-type: application/json</code></pre>
+    <p>And look at the body:</p>
+<pre class="code"><code>curl -s https://portal.example.com/portal/embed/manifest.json
+# → {"portalVersion":"1.8.0","bridgeProtocolVersion":1,"minSdkVersion":"1.0.0"}</code></pre>
+    <p>
+      If the content type is <code>text/html</code>, you are being served the single-page app's
+      <code>index.html</code> by a catch-all rewrite: either your path prefix is wrong, or the
+      manifest asset is not deployed. The SDK will fail with <code>manifestFailed</code> and show a
+      retry screen. The manifest is always fetched relative to the full base URL, never from the bare
+      origin, so this one command tests both halves of your configuration at once.
+    </p>
+    <p>
+      Do not try to fix a path problem by pointing <code>baseUrl</code> at the bare origin and
+      putting the prefix in the request instead. The prefix belongs in <code>baseUrl</code>; that is
+      the value the confinement rule, the manifest URL and the initial load are all derived from.
+    </p>
+  </section>
+
+  <section aria-labelledby="branch">
+    <h2 id="branch">5 — Find your <code>branchId</code></h2>
+    <p>
+      An Amthal deployment is multi-tenant. The <strong>branch</strong> is the
+      tenant/organisation whose forms, workflow and branding apply, and <code>branchId</code> is its
+      numeric id passed as a string — <code>"12"</code>, not <code>12</code>.
+    </p>
+    <p>
+      In almost every app this is a build-time constant: put it in your environment config
+      (<code>EXPO_PUBLIC_BRANCH_ID</code>, <code>BuildConfig</code>, an <code>xcconfig</code>). To
+      look it up, either anonymous endpoint works:
+    </p>
+<pre class="code"><code># resolves from the Host/Referer of the request
+curl -s "https://api.example.com/Portal/Container/GetPortalConfig"
+
+# resolves from an explicit origin
+curl -s "https://api.example.com/Container/GetWebsiteContainerInfo?referer=https://portal.example.com"
+# → { "succeeded": true, "data": { "branchID": 12, "companyName": "…", "primaryColor": "#…" } }</code></pre>
+    <div class="callout callout--warn">
+      <p>
+        <strong>Do not derive <code>branchId</code> from a login response.</strong> A customer or
+        contact login can legitimately carry a null branch, and an app that reads it from there works
+        for every test account until it meets one that does not. Use your configured value.
+      </p>
+    </div>
+    <p>
+      If you omit <code>branchId</code> on an anonymous session the portal falls back to resolving
+      the branch from the host name the WebView loaded. That is correct on a single-tenant host and
+      ambiguous anywhere else — pass it whenever you know it.
+    </p>
+  </section>
+
+  <section aria-labelledby="token">
+    <h2 id="token">6 — Obtain a token</h2>
+    <p>
+      Log in with your own call against the same backend the portal uses, and keep the token. The
+      SDK only ever receives it over the bridge.
+    </p>
+<pre class="code"><code>curl -s -X POST "https://api.example.com/Portal/Authentication/Authenticate" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"customer@example.com","password":"…","rememberme":true}'</code></pre>
+<pre class="code"><code>{
+  "success": true,
+  "authenticationResponse": {
+    "token": "eyJhbGciOi…",       // ← this is auth.token
+    "tokenExpiry": 1757000000,
+    "branchID": "12",
+    "employeeID": "4187"
+  }
+}</code></pre>
+
+    <h3>Where to keep it</h3>
+    <p>
+      The token, and only the token, in the platform keystore: iOS Keychain, Android Keystore, or
+      <code>expo-secure-store</code> in Expo. Never <code>AsyncStorage</code>, never a plain file,
+      never a log line. The SDK itself drops all portal log messages in release builds for the same
+      reason.
+    </p>
+
+    <h3>Refreshing</h3>
+    <p>
+      When the portal's own refresh fails it emits <code>authExpired</code> and pauses. Mint a fresh
+      token and hand it back — in React Native through the <code>refresh</code> function given to
+      <code>onAuthExpired</code> (or the ref's <code>updateAuth</code>, which is the same code path);
+      on the other hosts through <code>updateAuth</code> on the controller, view or sheet session.
+      A full-screen "refreshing your session" overlay is up the whole time and clears when the portal
+      acknowledges the new credentials.
+    </p>
+<pre class="code"><code>curl -s -X POST "https://api.example.com/Portal/Authentication/RefreshTokenWithExpiredToken" \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"&lt;the expired token&gt;","contactID":4187}'</code></pre>
+<pre class="code"><code>{
+  "succeeded": true,
+  "data": {
+    "token": "…",
+    "refreshtoken": "eyJhbGciOi…"   // ← the NEW token is HERE
+  }
+}</code></pre>
+    <div class="callout callout--warn">
+      <p>
+        <strong>Read <code>data.refreshtoken</code>, not <code>data.token</code>.</strong> Both
+        fields are populated and both look like tokens; the one you want is the second. This trips up
+        essentially every first integration, and the symptom is a refresh that appears to succeed and
+        then expires again immediately.
+      </p>
+    </div>
+
+    <h3>Anonymous sessions</h3>
+    <p>
+      For a public form in React Native, <strong>omit the <code>auth</code> prop entirely</strong>.
+      The <code>init</code> message then carries no <code>auth</code> key at all, which is how the
+      portal is told to render the public plane — and it also clears any credentials a previous
+      launch left in the WebView's storage.
+    </p>
+<pre class="code"><code>&lt;AmthalPortalForm config={config} request={request} /* no auth prop */ … /&gt;</code></pre>
+    <p>
+      Do <strong>not</strong> pass <code>{ token: '' }</code> to mean the same thing in React Native.
+      On the iOS, Android and Expo APIs the <code>auth</code> argument is not optional — there, an
+      empty token string is how an anonymous session is declared, and the native side treats a blank
+      token as no credential.
+    </p>
+    <p>
+      <code>auth.user</code> is optional everywhere: hand over the profile object your app already
+      holds and the portal skips a profile round-trip. Omit it and the portal reconstructs the user
+      from the token. Note the per-platform naming: TypeScript takes a <code>user</code> object,
+      Swift takes <code>userJSON</code> and Kotlin takes <code>userJson</code>, both as
+      already-serialised strings.
+    </p>
+  </section>
+
+  <section aria-labelledby="form">
+    <h2 id="form">7 — Choose <code>type</code> and <code>productID</code></h2>
+
+    <h3><code>type</code> selects the application plane</h3>
+    <table class="table">
+      <thead>
+        <tr><th scope="col"><code>type</code></th><th scope="col">Plane</th><th scope="col">Effect</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>'internal'</code> — the literal string</td>
+          <td>Signed in</td>
+          <td>Files the application against the signed-in contact; it appears in <em>their</em> requests list.</td>
+        </tr>
+        <tr>
+          <td>anything else — by convention <code>'external'</code></td>
+          <td>Anonymous / public</td>
+          <td>The server resolves a stand-in applicant; the submission belongs to nobody.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout callout--danger">
+      <p>
+        <strong>Getting <code>type</code> wrong fails silently.</strong> The portal tests
+        <code>type === "internal"</code> and falls through for every other value. Open a signed-in
+        user with <code>'external'</code> and the form loads, validates and submits successfully —
+        and the application then never appears in their history. There is no error to catch. Spell it
+        <code>internal</code>, in lower case, for any authenticated submission.
+      </p>
+    </div>
+
+    <h3><code>productID</code> is the form's id in the DMS catalogue</h3>
+<pre class="code"><code># anonymous / public catalogue
+curl -s "https://api.example.com/Portal/PublicForms/GetCategories?formType=1"
+
+# signed-in catalogue
+curl -s "https://api.example.com/Portal/Forms/GetCategories?formType=1" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+<pre class="code"><code>{
+  "succeeded": true,
+  "data": [
+    {
+      "id": 4,
+      "name": "Maintenance",
+      "subLevels": [
+        { "productID": 830, "productName": "Maintenance Request", "active": true, "visibility": true }
+      ]
+    }
+  ]
+}</code></pre>
+    <p>
+      <code>productID</code> is what you pass to the SDK; <code>productName</code> is what you show
+      the user. In most apps both already come from your own services or menu screen, which is driven
+      by this same catalogue.
+    </p>
+
+    <h3>The three request shapes</h3>
+    <table class="table">
+      <thead><tr><th scope="col">Request</th><th scope="col">Portal route it resolves to</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>{ kind: 'newApplication', type, productID }</code></td>
+          <td><code>{basePath}/embed/form/:type/:productID</code></td>
+        </tr>
+        <tr>
+          <td><code>{ kind: 'existingApplication', type, productID, batchID, headerID, readOnly }</code></td>
+          <td><code>{basePath}/embed/form/:type/:productID/:batchID/:headerID/:readOnly</code></td>
+        </tr>
+        <tr>
+          <td><code>{ kind: 'path', path }</code></td>
+          <td>Any other <code>{basePath}/embed/…</code> route — an escape hatch, not the normal way in.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      On iOS and Android the same three shapes exist as <code>PortalRequest.newApplication</code> /
+      <code>.existingApplication</code> / <code>.path</code> (Swift) and
+      <code>PortalRequest.NewApplication</code> / <code>.ExistingApplication</code> /
+      <code>.Path</code> (Kotlin). One difference worth knowing before you write the call:
+      <code>batchID</code> and <code>headerID</code> are a number-or-string union in TypeScript but
+      plain <code>String</code> on both native platforms.
+    </p>
+  </section>
+
+  <section aria-labelledby="snippets">
+    <h2 id="snippets">8 — A minimal working screen</h2>
+    <p>
+      Each snippet below is the smallest thing that renders a form and reports the outcome. They are
+      deliberately not feature-complete — locale switching, downloads, form delegation and custom
+      loading UI are all on the <a href="./api-reference.html">API reference</a> — but each one is a
+      whole working screen you can paste in and run.
+    </p>
+
+    <nav class="platform-tabs" aria-label="Jump to a platform snippet">
+      <a href="#snippet-rn">React Native</a>
+      <a href="#snippet-expo">Expo</a>
+      <a href="#snippet-ios">iOS</a>
+      <a href="#snippet-android">Android</a>
+    </nav>
+
+    <h3 id="snippet-rn">React Native — inline</h3>
+<pre class="code"><code>import React, { useRef } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+import {
+  AmthalPortalForm,
+  type AmthalPortalFormHandle,
+  type PortalSdkConfig,
+} from '@amthal-group/portal-react-native';
+
+const config: PortalSdkConfig = {
+  baseUrl: 'https://portal.example.com/portal',  // includes the deploy path prefix
+  locale: 'en',
+  theme: 'system',
+  brandColor: '#121E4C',                         // colours the SDK's own splash and retry button
+  minPortalVersion: '1.8.0',                     // optional floor: the oldest portal you tested
+};
+
+export function ServiceFormScreen({ token, productID, onClose }: {
+  token: string;
+  productID: number;
+  onClose: () =&gt; void;
+}) {
+  const portal = useRef&lt;AmthalPortalFormHandle&gt;(null);
+
+  return (
+    &lt;View style={styles.fill}&gt;
+      &lt;AmthalPortalForm
+        ref={portal}
+        config={config}
+        auth={{ token, branchId: '12' }}
+        request={{ kind: 'newApplication', type: 'internal', productID }}
+
+        onReady={() =&gt; console.log('portal ready')}
+        onSubmitted={(result) =&gt; {
+          // The SDK never auto-closes — decide for yourself what happens next.
+          Alert.alert('Submitted', `Application ${result.applicationNo ?? ''}`);
+          onClose();
+        }}
+        onCancelled={onClose}
+        onError={(error) =&gt; console.warn(error.code, error.message)}
+        onAuthExpired={async (refresh) =&gt; refresh({ token: await myRefreshToken(), branchId: '12' })}
+        onCloseRequested={onClose}
+      /&gt;
+    &lt;/View&gt;
+  );
+}
+
+const styles = StyleSheet.create({ fill: { flex: 1 } });
+
+declare function myRefreshToken(): Promise&lt;string&gt;;</code></pre>
+    <div class="callout callout--warn">
+      <p>
+        <strong><code>onCloseRequested</code> is optional in the type and effectively required in
+        practice.</strong> The SDK installs its Android hardware-back handler <em>only</em> when you
+        pass it. Omit it and back is not intercepted at all: instead of stepping back through the
+        form, the platform default applies and your user leaves the screen mid-application. The three
+        callbacks the compiler does enforce are <code>onSubmitted</code>, <code>onCancelled</code> and
+        <code>onError</code>.
+      </p>
+    </div>
+
+    <h3 id="snippet-expo">Expo — native iOS sheet</h3>
+<pre class="code"><code>import { presentPortalSheet, type PortalSheetSession } from '@amthal-group/portal-expo';
+
+const PORTAL_BASE_URL = 'https://portal.example.com/portal';
+const BRANCH_ID = '12';
+
+let sheet: PortalSheetSession | null = null;
+
+export function openServiceForm(token: string, productID: number) {
+  sheet = presentPortalSheet({
+    config: { baseUrl: PORTAL_BASE_URL, locale: 'en', theme: 'system' },
+    auth: { token, branchId: BRANCH_ID },
+    request: { kind: 'newApplication', type: 'internal', productID },
+    sheet: { detents: ['large', 'medium'], grabber: true, cornerRadius: 20 },
+
+    onReady: ({ portalVersion }) =&gt; console.log('portal', portalVersion),
+    onSubmitted: (result) =&gt; console.log('application', result.applicationNo),
+    onCancelled: () =&gt; sheet?.dismiss(),
+    onError: (error) =&gt; console.warn(error.code, error.message),
+    onAuthExpired: async () =&gt; sheet?.updateAuth({ token: await myRefreshToken(), branchId: BRANCH_ID }),
+    onClosed: () =&gt; { sheet = null; },
+  });
+}
+
+declare function myRefreshToken(): Promise&lt;string&gt;;</code></pre>
+    <p>
+      <code>sheet.dismiss()</code> runs the SDK's unsaved-changes guard before closing, so it is safe
+      to wire straight to a Cancel button. Every listener is torn down automatically when
+      <code>onClosed</code> fires. Note that the Expo config object has no <code>brandColor</code> —
+      the native sheet always uses the platform default tint for its interstitials.
+    </p>
+
+    <h3 id="snippet-ios">iOS — UIKit, presented modally</h3>
+<pre class="code"><code>import AmthalPortal
+import UIKit
+
+final class ServicesViewController: UIViewController, AmthalPortalDelegate {
+
+    func openForm(token: String, productID: Int) {
+        guard let baseURL = URL(string: "https://portal.example.com/portal") else { return }
+
+        do {
+            let config = try PortalConfig(
+                baseURL: baseURL,               // includes the deploy path prefix
+                locale: .en,
+                theme: .system,
+                brandColor: UIColor(red: 0.07, green: 0.12, blue: 0.30, alpha: 1),
+                minPortalVersion: "1.8.0"
+            )
+            AmthalPortalViewController.present(
+                from: self,
+                config: config,
+                request: .newApplication(type: "internal", productID: productID),
+                auth: PortalAuth(token: token, branchId: "12"),
+                delegate: self
+            )
+        } catch {
+            // PortalConfigError.invalidBaseURL / .insecureBaseURL
+            print("portal config rejected:", error)
+        }
+    }
+
+    // MARK: AmthalPortalDelegate — every method has a default, override what you need.
+
+    func portalReady(portalVersion: String) {
+        print("portal", portalVersion)
+    }
+
+    func formSubmitted(_ result: FormSubmitResult) {
+        // The SDK never auto-closes; dismiss when you are ready.
+        dismiss(animated: true)
+    }
+
+    func portalError(_ error: PortalError) {
+        print(error.code.rawValue, error.message)
+    }
+}</code></pre>
+    <p>
+      <code>present(from:)</code> wraps the controller in a <code>UINavigationController</code>
+      presented as a page sheet, installs a Close button, and routes both that button and
+      swipe-to-dismiss through the unsaved-changes guard. The initialiser
+      <strong>throws</strong> — <code>PortalConfigError.invalidBaseURL</code> for a URL with no
+      scheme or host, <code>.insecureBaseURL</code> for plain HTTP outside loopback — so a
+      <code>do/catch</code> is not optional. There is also a SwiftUI wrapper,
+      <code>AmthalPortalView</code>, that takes the same config plus closures.
+    </p>
+
+    <h3 id="snippet-android">Android — full-screen Activity</h3>
+<pre class="code"><code>import android.content.Context
+import android.util.Log
+import com.amthalgroup.portal.*
+
+fun openForm(context: Context, token: String, productID: Int) {
+    val config = PortalConfig(
+        baseUrl = "https://portal.example.com/portal",  // includes the deploy path prefix
+        locale = PortalLocale.EN,
+        theme = PortalTheme.SYSTEM,
+        brandColor = 0xFF121E4C.toInt(),
+        minPortalVersion = "1.8.0"
+    )
+
+    PortalFormActivity.start(
+        context,
+        config,
+        PortalRequest.NewApplication(type = "internal", productID = productID),
+        PortalAuth(token = token, branchId = "12"),
+        object : AmthalPortalListener {
+
+            override fun onPortalReady(portalVersion: String) {
+                Log.i("Portal", "ready $portalVersion")
+            }
+
+            override fun onFormSubmitted(result: FormSubmitResult) {
+                Log.i("Portal", "application ${result.applicationNo} / product ${result.productID}")
+                // The SDK never auto-closes: finish the activity yourself when ready.
+            }
+
+            override fun onPortalError(error: PortalError) {
+                Log.w("Portal", "${error.code} ${error.message}")
+            }
+        }
+    )
+}</code></pre>
+    <p>
+      <code>PortalFormActivity</code> is already declared in the SDK's own manifest, routes hardware
+      back through the bridge, and wires file uploads for you — it is the fastest path on Android.
+      <code>PortalFormFragment</code> and the bare <code>AmthalPortalView</code> exist for hosts that
+      need the portal inside their own chrome. The <code>PortalConfig</code> constructor
+      <strong>throws <code>IllegalArgumentException</code></strong> for a bad
+      <code>baseUrl</code> — including one carrying a query or fragment, which Android is the only
+      platform to reject at construction time.
+    </p>
+    <p>
+      Of the listener's seven methods, exactly two have no default body and must be implemented:
+      <code>onFormSubmitted</code> and <code>onPortalError</code>.
+    </p>
+  </section>
+
+  <section aria-labelledby="verify">
+    <h2 id="verify">9 — Run it and verify</h2>
+    <p>
+      A successful first launch has a recognisable shape. You see the SDK's own loading splash for a
+      moment — your <code>brandColor</code>, if you set one — and then the portal's form, edge to
+      edge, with its action bar pinned to the bottom above the home indicator. Nothing bounces into a
+      browser, and nothing sits on the splash for more than a few seconds.
+    </p>
+
+    <div class="shot-grid">
+      <figure class="shot">
+        <img src="assets/screenshots/ios-splash.png" alt="iPhone screenshot of the Amthal Portal SDK loading splash: a brand-coloured wash filling the screen with the host app's logo centred." loading="lazy" />
+        <figcaption>The SDK's own splash, up before the WebView can speak — which is why <code>brandColor</code> is set in config rather than sent over the bridge.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="assets/screenshots/ios-form.png" alt="iPhone screenshot of a single-step Amthal portal form rendered edge to edge inside a host app, with a Submit button pinned to the bottom of the screen." loading="lazy" />
+        <figcaption>A single-step form on iOS. The Submit action is pinned; the SDK does not close on submit.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="assets/screenshots/android-form.png" alt="Android screenshot of a three-step Amthal portal form rendered edge to edge, with Previous and Submit buttons pinned to the bottom of the screen." loading="lazy" />
+        <figcaption>A three-step form on Android, with the stepper's Previous and Submit pinned.</figcaption>
+      </figure>
+    </div>
+
+    <h3>Your checklist</h3>
+    <ul>
+      <li><strong>The splash disappears.</strong> That means the portal sent <code>ready</code>; your <code>onReady</code> / <code>onPortalReady</code> callback fires at the same moment with the portal version.</li>
+      <li><strong>You stay inside the app.</strong> Tapping through the form must never open Safari or Chrome. If it does, your <code>baseUrl</code> is missing the path prefix — go back to <a href="#base-url">step 4</a>.</li>
+      <li><strong>The form is the right one,</strong> and on the right plane. Submit a test application and confirm it appears in that customer's request list in the portal. If it submits but never appears, <code>type</code> is not the literal <code>'internal'</code> — <a href="#form">step 7</a>.</li>
+      <li><strong>Back behaves.</strong> On Android, hardware back should step back through a multi-step form rather than leaving the screen. If it leaves immediately, you have not passed <code>onCloseRequested</code>.</li>
+      <li><strong>Submission reaches you.</strong> <code>onSubmitted</code> fires with the application number, and the screen is still open — closing it is your code's job.</li>
+    </ul>
+
+    <h3>When it does not load, read the error code first</h3>
+    <p>
+      Every failure arrives as a typed code on your error callback. These four cover essentially every
+      first-run problem:
+    </p>
+    <table class="table">
+      <thead><tr><th scope="col">Code</th><th scope="col">What it actually means on day one</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>manifestFailed</code></td>
+          <td>The manifest was not JSON, could not be fetched, or timed out. Nine times out of ten the path prefix is wrong and you were served the SPA's HTML. Re-run the <code>curl -sI</code> from <a href="#base-url">step 4</a>.</td>
+        </tr>
+        <tr>
+          <td><code>versionIncompatible</code></td>
+          <td>One of three gates failed: the portal's <code>bridgeProtocolVersion</code> is not 1, the portal is older than your <code>minPortalVersion</code>, or the SDK is older than the manifest's <code>minSdkVersion</code>. Compare your numbers against the manifest body you already fetched.</td>
+        </tr>
+        <tr>
+          <td><code>bridgeTimeout</code></td>
+          <td>The page loaded but the portal never said <code>hello</code> within 15 seconds — usually a portal build without the embed shim, or a URL that landed on a non-embed route.</td>
+        </tr>
+        <tr>
+          <td><code>loadFailed</code></td>
+          <td>A generic load failure — and, in release builds, what you get for an insecure <code>baseUrl</code>. Check the message text, which names the reason.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      The full list of eight codes, what raises each one per platform, and which ones auto-retry when
+      connectivity returns, is on <a href="./troubleshooting.html">Troubleshooting</a>.
+    </p>
+
+    <h3>Smoke-testing without a device</h3>
+    <p>
+      Against a <code>-dev</code> build of the portal you can drive the embed routes from a desktop
+      browser, with a mock host standing in for the native SDK. This is the fastest way to confirm a
+      <code>productID</code> or check an Arabic layout before you rebuild an app:
+    </p>
+<pre class="code"><code>{baseUrl}/embed/form/external/{productID}?mockEmbed=1
+
+# authenticated, and with locale / theme / font scale overrides
+{baseUrl}/embed/form/internal/{productID}?mockEmbed=1&amp;mockToken=&lt;jwt&gt;&amp;mockBranch=12&amp;mockLocale=ar&amp;mockTheme=dark&amp;mockFontScale=1.2</code></pre>
+    <p>
+      The harness is installed only on a <code>-dev</code> portal build, and the default is
+      anonymous — add <code>mockToken</code> and <code>mockBranch</code> to exercise the
+      authenticated plane. <code>mockPlatform=ios|android|react-native</code> changes which transport
+      hint the portal sees.
+    </p>
+  </section>
+
+  <section aria-labelledby="dev-http">
+    <h2 id="dev-http">10 — Developing against a plain-HTTP portal</h2>
+    <p>
+      HTTPS is mandatory. Plain <code>http://</code> is accepted only for loopback hosts —
+      <code>localhost</code> and <code>127.0.0.1</code> everywhere, plus <code>10.0.2.2</code> (the
+      Android emulator's alias for your machine) on the React Native and Android hosts, and
+      <code>::1</code> on iOS and Android.
+    </p>
+    <p>
+      An Amthal portal dev server is often bound to a <em>tenant hostname</em> instead, because the
+      backend resolves the tenant from the request host. For that case there is a development-only
+      escape hatch, and it takes two things — the flag alone is not enough:
+    </p>
+    <ol>
+      <li>
+        <code>allowInsecureHttp</code> on the config (<strong>note the casing on Swift, where it is
+        <code>allowInsecureHTTP</code></strong>). It is build-gated at the source: honoured only
+        under <code>__DEV__</code> in React Native, <code>#if DEBUG</code> on iOS and Expo, and a
+        debuggable application on Android. A release build enforces HTTPS no matter what you pass.
+      </li>
+      <li>
+        A platform transport exception — an ATS <code>NSExceptionDomains</code> entry in
+        <code>Info.plist</code> (or <code>ios.infoPlist</code> in <code>app.config.ts</code>, followed
+        by a prebuild) on iOS, or a scoped <code>network_security_config</code> in your debug source
+        set on Android.
+      </li>
+    </ol>
+    <p>
+      Both are inert in a release build, but both are also a review finding waiting to happen. Keep
+      them in debug-only configuration rather than switching them on globally. If your forms take
+      photo or file attachments you will also need the usual iOS camera and photo-library usage
+      strings; on Android, file uploads work out of the box under
+      <code>PortalFormActivity</code>.
+    </p>
+  </section>
+
+  <section aria-labelledby="before-you-ship">
+    <h2 id="before-you-ship">11 — Before you ship</h2>
+    <ul>
+      <li><strong>Strip the development hatches</strong> from release configuration — <code>allowInsecureHttp</code>, the ATS exception, the network security config.</li>
+      <li><strong>Scope <code>enableLogging</code> to development.</strong> The SDK drops portal log messages in release builds regardless, but leaving the flag on states an intent you do not have.</li>
+      <li><strong>Set <code>minPortalVersion</code></strong> to the oldest portal build you have actually tested against, and present <code>versionIncompatible</code> to the user as "please update the app" rather than a generic failure.</li>
+      <li><strong>Confirm the token never leaves the keystore</strong> — not into analytics, not into a crash report's breadcrumbs, not into a URL. Credentials travel only over the bridge.</li>
+      <li><strong>Decide what happens after a submission.</strong> The SDK will sit on the submitted form forever if you let it; <code>onSubmitted</code> is where your app navigates, refreshes a list, or shows its own confirmation.</li>
+    </ul>
+
+    <div class="card-grid">
+      <article class="card">
+        <h3>Configuration</h3>
+        <p>Every field on <code>PortalSdkConfig</code> / <code>PortalConfig</code>, per platform, with defaults and the per-platform differences.</p>
+        <p><a href="./configuration.html">Read the configuration reference →</a></p>
+      </article>
+      <article class="card">
+        <h3>API reference</h3>
+        <p>Component props, handles, delegates and listeners — including the pieces this page left out: downloads, form delegation, custom loading and error UI.</p>
+        <p><a href="./api-reference.html">Read the API reference →</a></p>
+      </article>
+      <article class="card">
+        <h3>Bridge protocol</h3>
+        <p>The message catalogue, the handshake, the timeouts and the manifest contract — what you need when you are debugging the wire rather than the API.</p>
+        <p><a href="./bridge-protocol.html">Read the protocol →</a></p>
+      </article>
+      <article class="card">
+        <h3>Troubleshooting</h3>
+        <p>All eight error codes, what raises each on each platform, and the silent failures that have no error code at all.</p>
+        <p><a href="./troubleshooting.html">Read troubleshooting →</a></p>
+      </article>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34" />
+    <p>
+      Amthal Portal SDK — embed the Amthal Client Portal and its form builder in native and hybrid
+      mobile apps. Bridge Protocol v1 · SDK 1.0.0.
+    </p>
+    <p><a href="https://github.com/Amthal-Group/amthal-portal-sdk">github.com/Amthal-Group/amthal-portal-sdk</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

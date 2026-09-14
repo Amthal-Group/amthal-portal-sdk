@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API reference — Amthal Portal SDK</title>
+<meta name="description" content="Complete verified API surface of the Amthal Portal SDK: React Native, Expo, iOS (Swift) and Android (Kotlin) — config, props, handles, delegates, listeners, request and auth shapes.">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  /* Page-specific: keep deep-linked headings clear of the viewport edge. */
+  [id] { scroll-margin-top: 1.25rem; }
+  .api-sig { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="site-header__brand" href="./index.html">
+      <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group — Portal SDK home" height="34">
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="./index.html">Overview</a>
+      <a href="./getting-started.html">Getting started</a>
+      <a href="./configuration.html">Configuration</a>
+      <a href="./api-reference.html" aria-current="page">API reference</a>
+      <a href="./bridge-protocol.html">Bridge protocol</a>
+      <a href="./troubleshooting.html">Troubleshooting</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+  <h1>API reference</h1>
+
+  <p class="lede">
+    Every public type, property, method and callback of the Amthal Portal SDK, for all four hosts:
+    the React Native wrapper, the Expo native sheet, the iOS Swift package and the Android library.
+    All four speak <strong>Amthal Bridge Protocol v1</strong> and all four report
+    <strong>SDK version 1.0.0</strong>.
+  </p>
+
+  <p>
+    The four hosts deliberately share one vocabulary — <code>baseUrl</code>, <code>locale</code>,
+    <code>theme</code>, <code>fontScale</code>, a request, an auth object and an error code — so that a
+    behaviour you learn on one platform transfers to the next. Where they differ, they differ for a
+    concrete reason, and every such difference is called out in
+    <a href="#differences">Cross-platform differences</a>. Read that section before you assume a field
+    exists everywhere; three of the traps below are pure casing.
+  </p>
+
+  <nav class="anchor-list" aria-label="On this page">
+    <a href="#shared">1. Shared shapes — request, auth, result, error</a>
+    <a href="#react-native">2. React Native — <code>@amthal-group/portal-react-native</code></a>
+    <a href="#expo">3. Expo — <code>@amthal-group/portal-expo</code></a>
+    <a href="#ios">4. iOS — <code>AmthalPortal</code> (Swift)</a>
+    <a href="#android">5. Android — <code>com.amthalgroup:portal-sdk</code> (Kotlin)</a>
+    <a href="#differences">6. Cross-platform differences</a>
+  </nav>
+
+  <div class="callout callout--warn">
+    <p>
+      <strong><code>baseUrl</code> must include the portal's deploy path prefix.</strong>
+      The Client Portal ships with <code>&lt;base href="/portal/"&gt;</code>, so the correct value is
+      <code>https://portal.example.com/portal</code>, never <code>https://portal.example.com</code>.
+      Every host computes its navigation boundary as <code>basePath + "/embed"</code>, so dropping the
+      prefix makes the portal's very first in-app navigation look off-subtree and throws the user out
+      into the system browser. This is the single most common integration failure.
+    </p>
+  </div>
+
+  <!-- ============================================================ SHARED -->
+  <section id="shared" aria-labelledby="shared-h">
+    <h2 id="shared-h">1. Shared shapes</h2>
+
+    <p>
+      These four shapes — what to show, who is asking, what came back, what went wrong — are the whole
+      data surface of the SDK. The TypeScript definitions are canonical
+      (<code>@amthal-group/portal-bridge</code>); Swift and Kotlin mirror them type-for-type with the
+      naming differences noted.
+    </p>
+
+    <h3 id="shared-request">Request — what the portal should show</h3>
+
+    <p>
+      A request is mapped to a portal route and the WebView is navigated straight to it: the URL
+      <em>is</em> the request. Credentials never appear in it — they travel over the bridge only.
+    </p>
+
+<pre class="code"><code>// TypeScript — React Native and Expo
+type PortalFormRequest =
+  | { kind: 'newApplication';      type: string; productID: number }
+  | { kind: 'existingApplication'; type: string; productID: number;
+      batchID: number | string; headerID: number | string; readOnly: boolean }
+  | { kind: 'path'; path: string };</code></pre>
+
+<pre class="code"><code>// Swift
+public enum PortalRequest: Equatable, Sendable {
+    case newApplication(type: String, productID: Int)
+    case existingApplication(type: String, productID: Int,
+                             batchID: String, headerID: String, readOnly: Bool)
+    case path(String)
+    public var path: String { /* mirrors requestToPath() */ }
+}</code></pre>
+
+<pre class="code"><code>// Kotlin
+sealed class PortalRequest {
+    data class NewApplication(val type: String, val productID: Int) : PortalRequest()
+    data class ExistingApplication(
+        val type: String, val productID: Int,
+        val batchID: String, val headerID: String, val readOnly: Boolean
+    ) : PortalRequest()
+    data class Path(val path: String) : PortalRequest()
+    fun toPath(): String
+}</code></pre>
+
+    <table class="table">
+      <caption>Route each request resolves to (<code>requestToPath</code>)</caption>
+      <thead>
+        <tr><th scope="col">Kind</th><th scope="col">Resolved path</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>newApplication</code></td>
+          <td><code>/embed/form/{type}/{productID}</code> — <code>type</code> is URI-component encoded</td>
+        </tr>
+        <tr>
+          <td><code>existingApplication</code></td>
+          <td><code>/embed/form/{type}/{productID}/{batchID}/{headerID}/{readOnly}</code></td>
+        </tr>
+        <tr>
+          <td><code>path</code></td>
+          <td>A leading <code>/</code> is added if missing, and <code>/embed</code> is prefixed when the path does not already start with it</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout--danger">
+      <p>
+        <strong><code>type</code> must be the literal string <code>'internal'</code> for a signed-in
+        submission.</strong> The portal compares it against that exact value
+        (<code>isInternalForm = type() === "internal"</code>). Open a signed-in user with
+        <code>'external'</code> and the submission still succeeds — but the application never appears
+        in that user's history. It fails silently, which is why it is worth a line of code to get right.
+      </p>
+    </div>
+
+    <h3 id="shared-auth">Auth — the credentials handed over the bridge</h3>
+
+    <table class="table">
+      <caption>The same three values, four spellings</caption>
+      <thead>
+        <tr><th scope="col">Host</th><th scope="col">Type</th><th scope="col">Fields</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>React Native</td>
+          <td><code>PortalAuthState</code></td>
+          <td><code>token: string</code> · <code>branchId?: string | null</code> · <code>user?: unknown</code></td>
+        </tr>
+        <tr>
+          <td>Expo (JS)</td>
+          <td><code>PortalAuthState</code></td>
+          <td>Same three. <code>user</code> is JSON-stringified into <code>userJSON</code> before it crosses to native</td>
+        </tr>
+        <tr>
+          <td>iOS</td>
+          <td><code>PortalAuth</code></td>
+          <td><code>token: String</code> · <code>branchId: String?</code> · <code class="api-sig">userJSON: String?</code></td>
+        </tr>
+        <tr>
+          <td>Android</td>
+          <td><code>PortalAuth</code></td>
+          <td><code>token: String</code> · <code>branchId: String? = null</code> · <code class="api-sig">userJson: String? = null</code> — <code>toString()</code> redacts all three</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      <code>user</code> / <code>userJSON</code> / <code>userJson</code> is optional everywhere: omit it
+      and the portal rebuilds the user object from its own profile endpoint using the token. Supply it
+      only when you already hold that object and want to save the round trip.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>Anonymous sessions are a React Native feature.</strong> Omit the <code>auth</code> prop
+        entirely and <code>init</code> carries no <code>auth</code> key at all — that is how the portal
+        is told to render the public plane and to drop credentials a previous launch left in WebView
+        storage. Do <em>not</em> pass <code>{ token: '' }</code> to mean the same thing. The Expo, iOS
+        and Android APIs take a non-optional auth object, so a blank token is the only shape available
+        there.
+      </p>
+    </div>
+
+    <h3 id="shared-result">Submit result</h3>
+
+<pre class="code"><code>interface FormSubmittedPayload {   // exported as FormSubmitResult by both wrappers
+  productID: number;
+  applicationNo?: number | string;
+  batchID?: number | string;
+  headerID?: number | string;
+  raw?: unknown;                  // anything else the portal surfaces; opaque to the SDK
+}</code></pre>
+
+    <p>
+      The SDK <strong>never auto-closes on submit</strong> on any platform. Your callback decides what
+      happens next — close the screen, show a receipt, navigate to a status page. On the Expo native
+      sheet, <code>raw</code> is dropped when the result is serialized across to JavaScript even though
+      the TypeScript type includes it; read the typed fields there.
+    </p>
+
+    <h3 id="shared-error">Error</h3>
+
+    <p>
+      Eight codes, identical on every platform: <code>offline</code>, <code>loadFailed</code>,
+      <code>httpError</code>, <code>manifestFailed</code>, <code>bridgeTimeout</code>,
+      <code>versionIncompatible</code>, <code>authExpired</code>, <code>webProcessTerminated</code>.
+      What triggers each one, and which are auto-retried, is on the
+      <a href="./troubleshooting.html">Troubleshooting</a> page.
+    </p>
+
+    <table class="table">
+      <caption>Error object per host</caption>
+      <thead>
+        <tr><th scope="col">Host</th><th scope="col">Shape</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>React Native / Expo</td><td><code>PortalErrorInfo { code: PortalErrorCode; message?: string; httpStatus?: number }</code></td></tr>
+        <tr><td>iOS</td><td><code>PortalError { code: PortalErrorCode; message: String }</code> — <code>.httpError(Int)</code> carries the status as an associated value, plus <code>code.httpStatus: Int?</code> and <code>code.rawValue: String</code></td></tr>
+        <tr><td>Android</td><td><code>PortalError(code: PortalErrorCode, message: String? = null, httpStatus: Int? = null)</code>; each enum member exposes <code>.wire</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="shared-enums">Locale and theme</h3>
+
+    <p>
+      Both are closed sets on every platform. Locale is <code>'en' | 'ar'</code> — there is no third
+      value, and <code>'ar'</code> also flips the portal's document direction to RTL. Theme is
+      <code>'light' | 'dark' | 'system'</code> and defaults to <code>system</code>; it drives the
+      portal's own UI <em>and</em> the SDK's loading and error overlays, so setting it wrong produces a
+      visible flash of the wrong scheme before the portal renders. In Swift they are
+      <code>PortalLocale</code> / <code>PortalTheme</code> (<code>.en</code>, <code>.ar</code>;
+      <code>.light</code>, <code>.dark</code>, <code>.system</code>); in Kotlin the same enums expose
+      the wire string as <code>.wire</code>.
+    </p>
+  </section>
+
+  <!-- ======================================================= REACT NATIVE -->
+  <section id="react-native" aria-labelledby="rn-h">
+    <h2 id="rn-h">2. React Native — <code>@amthal-group/portal-react-native</code></h2>
+
+    <p>
+      A pure-TypeScript wrapper over <code>react-native-webview</code> that renders the portal
+      <strong>inline</strong>, inside your own navigation. It is the only host that supports form
+      delegation and the only one that lets you replace the loading and error UI with your own
+      components. Peer dependencies: <code>react &gt;= 18</code>, <code>react-native &gt;= 0.72</code>,
+      <code>react-native-webview &gt;= 13</code>.
+    </p>
+
+<pre class="code"><code>import { AmthalPortalForm, type AmthalPortalFormHandle } from '@amthal-group/portal-react-native';
+
+const portal = useRef&lt;AmthalPortalFormHandle&gt;(null);
+
+&lt;AmthalPortalForm
+  ref={portal}
+  config={{ baseUrl: 'https://portal.example.com/portal', locale: 'en', theme: 'system',
+            brandColor: '#121E4C' }}
+  auth={{ token, branchId: '12' }}
+  request={{ kind: 'newApplication', type: 'internal', productID: 42 }}
+  onSubmitted={(r) =&gt; navigation.replace('Receipt', { applicationNo: r.applicationNo })}
+  onCancelled={() =&gt; navigation.goBack()}
+  onError={(e) =&gt; console.warn(e.code, e.message)}
+  onCloseRequested={() =&gt; navigation.goBack()}
+  style={{ flex: 1 }}
+/&gt;</code></pre>
+
+    <h3 id="rn-config"><code>PortalSdkConfig</code></h3>
+
+    <table class="table">
+      <caption>Static session configuration</caption>
+      <thead>
+        <tr>
+          <th scope="col">Field</th><th scope="col">Type</th>
+          <th scope="col">Required</th><th scope="col">Default</th><th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>baseUrl</code></td><td><code>string</code></td><td>Yes</td><td>—</td>
+          <td>Portal base URL <em>including</em> the deploy path prefix. HTTPS required;
+            <code>http://localhost</code>, <code>127.0.0.1</code> and <code>10.0.2.2</code> are
+            allowed. Never a query string or credentials.</td>
+        </tr>
+        <tr>
+          <td><code>locale</code></td><td><code>'en' | 'ar'</code></td><td>No</td><td>nothing sent</td>
+          <td>Forwarded as <code>configure.locale</code>.</td>
+        </tr>
+        <tr>
+          <td><code>theme</code></td><td><code>'light' | 'dark' | 'system'</code></td><td>No</td><td>nothing sent; protocol default <code>system</code></td>
+          <td>Also resolves the SDK's own overlays: dark when <code>theme === 'dark'</code>, or when it is not <code>'light'</code> and the device scheme is dark.</td>
+        </tr>
+        <tr>
+          <td><code>fontScale</code></td><td><code>number</code></td><td>No</td><td><code>1.0</code></td>
+          <td>The portal maps it to a root font-size adjustment.</td>
+        </tr>
+        <tr>
+          <td><code>brandColor</code></td><td><code>string</code></td><td>No</td><td>surface foreground (<code>#1a1a1a</code> light / <code>#f3f4f6</code> dark)</td>
+          <td>Only <code>#rgb</code>, <code>#rrggbb</code> and <code>#rrggbbaa</code> are accepted — anything else is silently ignored. Tints the SDK's <em>own</em> splash and retry button, not the portal UI. It cannot arrive over the bridge, because the splash is on screen before the WebView can speak.</td>
+        </tr>
+        <tr>
+          <td><code>minPortalVersion</code></td><td><code>string</code></td><td>No</td><td>—</td>
+          <td>A manifest <code>portalVersion</code> below this fails with <code>versionIncompatible</code>.</td>
+        </tr>
+        <tr>
+          <td><code>allowedOrigins</code></td><td><code>string[]</code></td><td>No</td><td>the origin of <code>baseUrl</code></td>
+          <td>Extra origins permitted for main-frame navigation. Rarely needed.</td>
+        </tr>
+        <tr>
+          <td><code>enableLogging</code></td><td><code>boolean</code></td><td>No</td><td><code>false</code></td>
+          <td>Honoured only under <code>__DEV__</code>; release builds always drop portal <code>log</code> messages.</td>
+        </tr>
+        <tr>
+          <td><code>allowInsecureHttp</code></td><td><code>boolean</code></td><td>No</td><td><code>false</code></td>
+          <td><code>__DEV__</code>-only cleartext hatch for a non-loopback dev host. A release build rejects the load with <code>loadFailed</code> ("Insecure baseUrl rejected…") no matter what this says.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 id="rn-props"><code>AmthalPortalFormProps</code></h3>
+
+    <table class="table">
+      <caption>Component props. <code>onSubmitted</code>, <code>onCancelled</code> and <code>onError</code> are type-required.</caption>
+      <thead>
+        <tr><th scope="col">Prop</th><th scope="col">Signature</th><th scope="col">What it is for</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>config</code></td><td class="api-sig">PortalSdkConfig</td><td>Required. See above.</td></tr>
+        <tr><td><code>auth</code></td><td class="api-sig">PortalAuthState | undefined</td><td>Omit entirely for an anonymous session. Changing it to a different, non-empty token after the handshake re-sends <code>auth</code> automatically; changing one anonymous shape for another sends nothing.</td></tr>
+        <tr><td><code>request</code></td><td class="api-sig">PortalFormRequest</td><td>Required. What to show.</td></tr>
+        <tr><td><code>onReady</code></td><td class="api-sig">() =&gt; void</td><td>The portal emitted <code>ready</code>; the loading overlay is gone.</td></tr>
+        <tr><td><code>onSubmitted</code></td><td class="api-sig">(result: FormSubmitResult) =&gt; void</td><td><strong>Required.</strong> Successful submission. The SDK does not close — you decide.</td></tr>
+        <tr><td><code>onCancelled</code></td><td class="api-sig">() =&gt; void</td><td><strong>Required.</strong> The user left via the form's own close/finish affordance.</td></tr>
+        <tr><td><code>onError</code></td><td class="api-sig">(error: PortalErrorInfo) =&gt; void</td><td><strong>Required.</strong> Any SDK-level failure — and <code>authExpired</code> too when no <code>onAuthExpired</code> is supplied.</td></tr>
+        <tr><td><code>onAuthExpired</code></td><td class="api-sig">(refresh: (auth: PortalAuthState) =&gt; void, reason?: string) =&gt; void</td><td>The portal's own refresh failed. Fetch a fresh token and call <code>refresh(next)</code>. A full-screen "Refreshing your session…" overlay is up from the moment the message arrives until the web acks or the 10 s round-trip times out.</td></tr>
+        <tr><td><code>onOpenExternal</code></td><td class="api-sig">(url: string) =&gt; boolean</td><td>Return <code>true</code> to handle the URL yourself; otherwise the SDK calls <code>Linking.openURL</code>.</td></tr>
+        <tr><td><code>onDownloadRequest</code></td><td class="api-sig">(download: DownloadRequestPayload) =&gt; void</td><td>The default is <code>Linking.openURL(payload.url)</code>, which <strong>cannot attach <code>headers</code></strong>. Implement this prop if your files need an <code>Authorization</code> header. Never log header values.</td></tr>
+        <tr><td><code>onNavigate</code></td><td class="api-sig">(navigation: NavigatePayload) =&gt; void</td><td>Informational route changes inside <code>/embed</code> — <code>{ path, title? }</code>. Useful for driving your own header title.</td></tr>
+        <tr><td><code>onFormOp</code></td><td class="api-sig">(request: FormOpRequestPayload) =&gt; Promise&lt;unknown&gt;</td><td>Form delegation. Providing it sets <code>formDelegation: true</code> in <code>init</code> and the portal routes every form data operation to you instead of calling its own endpoints. See <a href="./bridge-protocol.html">Bridge protocol</a>.</td></tr>
+        <tr><td><code>onCloseRequested</code></td><td class="api-sig">() =&gt; void</td><td>The web declined a back press. <strong>Without this prop the SDK installs no Android back handler at all</strong> and the platform default applies — treat it as required on Android.</td></tr>
+        <tr><td><code>style</code></td><td class="api-sig">StyleProp&lt;ViewStyle&gt;</td><td>Usually <code>{ flex: 1 }</code>.</td></tr>
+        <tr><td><code>renderLoading</code></td><td class="api-sig">() =&gt; React.ReactElement</td><td>Replaces the default splash, shown until <code>ready</code>.</td></tr>
+        <tr><td><code>renderError</code></td><td class="api-sig">(info: { error: PortalErrorInfo; retry: () =&gt; void }) =&gt; React.ReactElement</td><td>Replaces the default error UI; call <code>retry()</code> to reload.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="rn-handle"><code>AmthalPortalFormHandle</code></h3>
+
+    <p>Attach a <code>ref</code> to drive the session imperatively.</p>
+
+    <table class="table">
+      <thead>
+        <tr><th scope="col">Method</th><th scope="col">Signature</th><th scope="col">Behaviour</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>updateAuth</code></td><td class="api-sig">(auth: PortalAuthState) =&gt; void</td><td>Sends <code>auth</code> and clears the refreshing overlay on the reply or on timeout. Identical to the <code>refresh</code> callback given to <code>onAuthExpired</code>.</td></tr>
+        <tr><td><code>configure</code></td><td class="api-sig">(configure: ConfigurePayload) =&gt; void</td><td>Re-applies <code>locale</code> / <code>theme</code> / <code>fontScale</code> at runtime.</td></tr>
+        <tr><td><code>handleBackPress</code></td><td class="api-sig">() =&gt; Promise&lt;boolean&gt;</td><td><code>true</code> means the web consumed the press (it stepped back inside the form). <code>false</code> on <code>{handled:false}</code>, on a 10 s timeout, or when the session is not ready — close the screen.</td></tr>
+        <tr><td><code>requestDismiss</code></td><td class="api-sig">() =&gt; Promise&lt;boolean&gt;</td><td>For a gesture or button that <em>closes</em> rather than goes back (an iOS sheet swipe, your own ✕). <code>true</code> means it is safe to close without warning. It also resolves <code>true</code> when the bridge never opened — a broken bridge must never trap the user.</td></tr>
+        <tr><td><code>destroy</code></td><td class="api-sig">() =&gt; void</td><td>Best-effort <code>destroy</code> message, then all bridge activity stops. It also runs automatically on unmount, so most apps never call it.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="rn-splash"><code>PortalSplash</code></h3>
+
+    <p>
+      The SDK's default wait screen is exported, so a custom <code>renderLoading</code> can add your
+      logo without rebuilding the screen. It respects the system "reduce motion" setting and swaps its
+      caption after eight seconds so a slow network does not look like a hang.
+    </p>
+
+<pre class="code"><code>import { PortalSplash } from '@amthal-group/portal-react-native';
+
+renderLoading={() =&gt; (
+  &lt;PortalSplash
+    brandColor="#121E4C"
+    logo={&lt;Image source={require('./assets/logo.png')} style={{ width: 120, height: 40 }} /&gt;}
+    title="Tasleeh"
+  /&gt;
+)}</code></pre>
+
+    <table class="table">
+      <caption><code>PortalSplashProps</code></caption>
+      <thead><tr><th scope="col">Prop</th><th scope="col">Type</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>brandColor</code></td><td><code>ColorValue</code></td><td>Omit for a deliberately plain, unbranded wait.</td></tr>
+        <tr><td><code>logo</code></td><td><code>React.ReactNode</code></td><td>Your own already-laid-out element. Passing it replaces the animated beacon — the two are mutually exclusive on purpose.</td></tr>
+        <tr><td><code>dark</code></td><td><code>boolean</code></td><td>Default <code>false</code>. The caller has already resolved <code>'system'</code> to a real value.</td></tr>
+        <tr><td><code>title</code></td><td><code>string</code></td><td>Shown under the mark; usually the tenant's company name.</td></tr>
+        <tr><td><code>caption</code></td><td><code>string</code></td><td>Overrides the default caption.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="rn-exports">Package exports</h3>
+
+    <p>
+      <code>AmthalPortalForm</code>, the types <code>AmthalPortalFormProps</code> and
+      <code>AmthalPortalFormHandle</code>, <code>SDK_VERSION</code> (<code>'1.0.0'</code>),
+      <code>PortalSplash</code> and <code>PortalSplashProps</code>, the form-delegation types
+      <code>FormOp</code>, <code>FormOpRequestPayload</code>, <code>FormOpResponsePayload</code> and
+      <code>SerializedFormEntry</code>, plus everything in <code>types.ts</code> — which re-exports the
+      protocol types and these runtime helpers:
+      <code>BRIDGE_PROTOCOL_VERSION</code>, <code>EMBED_PATH_PREFIX</code>, <code>MANIFEST_PATH</code>,
+      <code>TIMINGS</code>, <code>basePathOf</code>, <code>compareVersions</code>,
+      <code>isEmbedPath</code>, <code>manifestUrl</code>, <code>requestToPath</code>,
+      <code>resolveEmbedUrl</code>.
+    </p>
+  </section>
+
+  <!-- =============================================================== EXPO -->
+  <section id="expo" aria-labelledby="expo-h">
+    <h2 id="expo-h">3. Expo — <code>@amthal-group/portal-expo</code></h2>
+
+    <p>
+      Presents the <em>native</em> iOS SDK inside a <code>UISheetPresentationController</code>, driven
+      from JavaScript. The chrome, the hardening and the interstitials are all native, which is why the
+      module is <strong>Apple-only</strong> (<code>"platforms": ["apple"]</code>) and why it needs a
+      development build — Expo Go cannot load it. The pod targets iOS 15.1.
+    </p>
+
+<pre class="code"><code>import { presentPortalSheet } from '@amthal-group/portal-expo';
+
+const session = presentPortalSheet({
+  config: { baseUrl: 'https://portal.example.com/portal', locale: 'en', theme: 'system' },
+  auth: { token, branchId: '12' },
+  request: { kind: 'newApplication', type: 'internal', productID: 42 },
+  sheet: { detents: ['large', 'medium'], grabber: true },
+  onSubmitted: (r) =&gt; console.log('submitted', r.applicationNo),
+  onError: (e) =&gt; console.warn(e.code, e.message),
+  onClosed: () =&gt; console.log('sheet closed'),
+});
+
+// later
+session.updateAuth({ token: fresh });
+session.dismiss();</code></pre>
+
+    <h3 id="expo-config"><code>PortalSdkConfig</code></h3>
+
+    <p>
+      The same field names as React Native <strong>minus <code>brandColor</code></strong>:
+      <code>baseUrl</code> (required), <code>locale</code>, <code>theme</code>, <code>fontScale</code>,
+      <code>minPortalVersion</code>, <code>allowedOrigins</code>, <code>enableLogging</code>,
+      <code>allowInsecureHttp</code>. The native side applies defaults while parsing:
+      <code>locale</code> → <code>en</code>, <code>theme</code> → <code>system</code>,
+      <code>fontScale</code> → <code>1.0</code>, <code>enableLogging</code> → <code>false</code>, and
+      <code>allowInsecureHttp</code> is forced to <code>false</code> outside <code>DEBUG</code> builds.
+    </p>
+
+    <div class="callout callout--warn">
+      <p>
+        <strong>There is no <code>brandColor</code> on the Expo sheet.</strong> It is neither declared
+        in the TypeScript config nor read by the native module, so the sheet always uses the platform
+        default tint for its loading interstitial. If brand-coloured waiting matters to you, use the
+        inline React Native component or the native iOS SDK directly.
+      </p>
+    </div>
+
+    <h3 id="expo-sheet"><code>PortalSheetOptions</code></h3>
+
+    <table class="table">
+      <thead><tr><th scope="col">Field</th><th scope="col">Type</th><th scope="col">Default</th></tr></thead>
+      <tbody>
+        <tr><td><code>detents</code></td><td><code>Array&lt;'large' | 'medium'&gt;</code></td><td><code>['large']</code> when empty or absent</td></tr>
+        <tr><td><code>grabber</code></td><td><code>boolean</code></td><td><code>true</code></td></tr>
+        <tr><td><code>cornerRadius</code></td><td><code>number</code></td><td>platform default</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Three behaviours are fixed by the module and are not configurable: the sheet does not expand when
+      its content is scrolled to the edge, it opens on the <code>large</code> detent whenever both are
+      offered, and it is presented as a page sheet.
+    </p>
+
+    <h3 id="expo-present"><code>presentPortalSheet(options)</code></h3>
+
+    <table class="table">
+      <caption><code>PresentPortalSheetOptions</code></caption>
+      <thead><tr><th scope="col">Field</th><th scope="col">Signature</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>config</code></td><td class="api-sig">PortalSdkConfig</td><td>Required.</td></tr>
+        <tr><td><code>auth</code></td><td class="api-sig">PortalAuthState</td><td><strong>Required here</strong>, unlike React Native. A missing token is defaulted to <code>""</code> natively.</td></tr>
+        <tr><td><code>request</code></td><td class="api-sig">PortalFormRequest</td><td>Required.</td></tr>
+        <tr><td><code>sheet</code></td><td class="api-sig">PortalSheetOptions</td><td>Presentation only.</td></tr>
+        <tr><td><code>onReady</code></td><td class="api-sig">(info: { portalVersion: string }) =&gt; void</td><td>Handshake complete; the portal is visible.</td></tr>
+        <tr><td><code>onSubmitted</code></td><td class="api-sig">(result: FormSubmitResult) =&gt; void</td><td>The sheet is <em>not</em> closed for you. <code>raw</code> is not carried across.</td></tr>
+        <tr><td><code>onCancelled</code></td><td class="api-sig">() =&gt; void</td><td>In-form close affordance.</td></tr>
+        <tr><td><code>onError</code></td><td class="api-sig">(error: PortalErrorInfo) =&gt; void</td><td>Session failures, plus every presentation rejection (see below).</td></tr>
+        <tr><td><code>onAuthExpired</code></td><td class="api-sig">(reason?: string) =&gt; void</td><td>Routed to this event and <strong>never</strong> to <code>onError</code>. Call <code>session.updateAuth</code> with a fresh token.</td></tr>
+        <tr><td><code>onNavigate</code></td><td class="api-sig">(navigation: { path: string; title?: string }) =&gt; void</td><td>Informational.</td></tr>
+        <tr><td><code>onClosed</code></td><td class="api-sig">() =&gt; void</td><td>Sheet dismissed by swipe, Close, or <code>dismiss()</code>. All listeners are torn down on the first <code>onClosed</code>.</td></tr>
+        <tr><td><code>onFormOp</code></td><td class="api-sig">(request: FormOpRequestPayload) =&gt; Promise&lt;unknown&gt;</td><td><strong>Not supported on this path.</strong> Providing it fails fast — <code>onError({ code: 'loadFailed', … })</code> — and returns a no-op session, rather than silently letting the portal call its own endpoints with the wrong identity.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="expo-session"><code>PortalSheetSession</code></h3>
+
+    <table class="table">
+      <thead><tr><th scope="col">Method</th><th scope="col">Signature</th><th scope="col">Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>updateAuth</code></td><td class="api-sig">(auth: PortalAuthState) =&gt; void</td><td>Re-issues credentials, e.g. after <code>onAuthExpired</code>.</td></tr>
+        <tr><td><code>configure</code></td><td class="api-sig">(configure: { locale?; theme?; fontScale? }) =&gt; void</td><td>Runtime appearance change.</td></tr>
+        <tr><td><code>dismiss</code></td><td class="api-sig">() =&gt; void</td><td>Calls the native <code>requestClose()</code>, so the confirm-discard guard runs when the form is dirty. It is a request, not a guarantee.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="expo-rejections">Presentation rejections</h3>
+
+    <p>
+      <code>present</code> can reject before any session exists. Each rejection is surfaced through
+      <code>onError</code> as <code>loadFailed</code> with the native code in the message:
+      <code>E_ALREADY_PRESENTED</code> (a sheet is already up), <code>E_NO_PRESENTER</code> (no view
+      controller to present from), <code>E_CONFIG</code> (the config was rejected — almost always the
+      base URL), <code>E_ARGS</code> (a malformed request or auth object) and <code>E_MODULE</code>
+      (the native module is missing, i.e. you are running Expo Go or an un-prebuilt app).
+    </p>
+
+    <p>
+      The underlying native module is named <code>AmthalPortalNative</code> and emits
+      <code>onReady</code>, <code>onSubmitted</code>, <code>onCancelled</code>, <code>onError</code>,
+      <code>onAuthExpired</code>, <code>onNavigate</code> and <code>onClosed</code>, with methods
+      <code>present</code>, <code>updateAuth</code>, <code>configure</code> and <code>dismiss</code>.
+      You normally use <code>presentPortalSheet</code> rather than the module directly.
+    </p>
+  </section>
+
+  <!-- ================================================================ IOS -->
+  <section id="ios" aria-labelledby="ios-h">
+    <h2 id="ios-h">4. iOS — <code>AmthalPortal</code> (Swift)</h2>
+
+    <p>
+      A Swift package (tools version 5.9, minimum iOS 15) whose product and library are both named
+      <code>AmthalPortal</code>. The root <code>Package.swift</code> is what SwiftPM resolves when you
+      add the repository by Git URL; <code>ios/Package.swift</code> exists for local-path consumption
+      from a checkout. <strong>No release tag exists yet — depend on <code>branch: "main"</code></strong>
+      until the first tag is cut.
+    </p>
+
+    <h3 id="ios-config"><code>PortalConfig</code></h3>
+
+<pre class="code"><code>public init(
+    baseURL: URL,
+    locale: PortalLocale = .en,
+    theme: PortalTheme = .system,
+    fontScale: Double = 1.0,
+    brandColor: UIColor? = nil,
+    minPortalVersion: String? = nil,
+    allowedOrigins: Set&lt;String&gt;? = nil,      // nil ⇒ [baseURL.host]
+    enableLogging: Bool = false,
+    allowInsecureHTTP: Bool = false
+) throws</code></pre>
+
+    <p>
+      Note the casing: <code class="api-sig">allowInsecureHTTP</code> here, against
+      <code>allowInsecureHttp</code> everywhere else. The initializer <em>throws</em>
+      <code>PortalConfigError.invalidBaseURL(URL)</code> when the URL has no scheme or host, and
+      <code>.insecureBaseURL(URL)</code> for plain HTTP to a non-localhost host. Both conform to
+      <code>Error</code>, <code>Equatable</code> and <code>LocalizedError</code>, so you can present
+      them directly. Localhost means <code>localhost</code>, <code>127.0.0.1</code>, <code>::1</code>,
+      <code>[::1]</code> or any <code>*.localhost</code>.
+    </p>
+
+    <p>
+      <code>baseURL</code>, <code>basePath</code> (the path minus trailing slashes, <code>""</code> at
+      the root) and <code>allowInsecureHTTP</code> are immutable <code>let</code>s — and the stored
+      insecure flag is already build-gated, so a release build cannot be pointed at an HTTP portal by
+      one boolean. <code>locale</code>, <code>theme</code>, <code>fontScale</code>,
+      <code>brandColor</code>, <code>minPortalVersion</code>, <code>allowedOrigins</code> and
+      <code>enableLogging</code> are <code>var</code>.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>What <code>brandColor</code> actually colours on iOS: the loading spinner, and only the
+        loading spinner.</strong> The retry button is a stock filled <code>UIButton</code> and keeps the
+        system tint. (The source's own doc comment claims the retry affordance too — it overstates it.)
+      </p>
+    </div>
+
+    <h3 id="ios-controller"><code>AmthalPortalViewController</code></h3>
+
+    <p>
+      A <code>public final class</code> deriving from <code>UIViewController</code>: a hardened
+      <code>WKWebView</code> bound to the bridge, plus the SDK's native chrome — loading skeleton, error
+      / offline / version / session interstitials, a connectivity watcher and the close/back guards.
+      <code>init(coder:)</code> is unavailable, so it cannot be instantiated from a storyboard.
+    </p>
+
+    <table class="table">
+      <thead><tr><th scope="col">Member</th><th scope="col">Signature</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>delegate</code></td><td class="api-sig">public weak var delegate: AmthalPortalDelegate?</td><td>All callbacks arrive on the main actor.</td></tr>
+        <tr><td><code>config</code></td><td class="api-sig">public private(set) var config: PortalConfig</td><td>Appearance fields are mutated by <code>updateConfigure</code>; the origin never changes.</td></tr>
+        <tr><td><code>request</code></td><td class="api-sig">public let request: PortalRequest</td><td>The request the controller was created for.</td></tr>
+        <tr><td>init</td><td class="api-sig">public init(config: PortalConfig, request: PortalRequest, auth: PortalAuth, delegate: AmthalPortalDelegate? = nil)</td><td>Push or present it yourself.</td></tr>
+        <tr><td><code>updateAuth</code></td><td class="api-sig">public func updateAuth(_ auth: PortalAuth)</td><td>Call at any time. Before <code>hello</code> the credentials simply ride on the next <code>init</code>. The session-expired overlay is hidden unless the portal explicitly rejects them.</td></tr>
+        <tr><td><code>updateConfigure</code></td><td class="api-sig">public func updateConfigure(locale: PortalLocale? = nil, theme: PortalTheme? = nil, fontScale: Double? = nil)</td><td>Sends <code>configure</code> and updates the stored config.</td></tr>
+        <tr><td><code>requestClose</code></td><td class="api-sig">public func requestClose()</td><td>Runs the dismiss guard: <code>{dirty:true}</code> shows a confirm-discard alert; <code>{dirty:false}</code>, a timeout, or a session that never became ready resolves the close.</td></tr>
+        <tr><td><code>performBack</code></td><td class="api-sig">public func performBack()</td><td>For your own back affordance. <code>{handled:true}</code> means the web stepped back; otherwise the close resolves.</td></tr>
+        <tr><td><code>present</code></td><td class="api-sig">@discardableResult public static func present(from presenter: UIViewController, config: PortalConfig, request: PortalRequest, auth: PortalAuth, delegate: AmthalPortalDelegate? = nil) -&gt; AmthalPortalViewController</td><td>Wraps the controller in a <code>UINavigationController</code> presented as a page sheet, installs a Close item, routes swipe-dismiss through the same guard, and dismisses itself when the close resolves.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="ios-delegate"><code>AmthalPortalDelegate</code></h3>
+
+    <p>
+      A <code>@MainActor</code> class protocol in which <strong>every method has a default no-op</strong>,
+      so you implement only what you need. In practice that means <code>formSubmitted</code>,
+      <code>portalError</code> and <code>closeRequested</code> are the ones worth writing.
+    </p>
+
+<pre class="code"><code>func portalReady(portalVersion: String)
+func formSubmitted(_ result: FormSubmitResult)
+func formCancelled()
+func portalError(_ error: PortalError)
+func openExternal(url: URL) -&gt; Bool      // default false ⇒ SDK presents SFSafariViewController
+func navigate(path: String, title: String?)
+func closeRequested()</code></pre>
+
+    <p>
+      <code>closeRequested()</code> fires when the close round-trip resolved to "close" — the web
+      answered <code>backPressed</code> with <code>{handled:false}</code>, or
+      <code>dismissRequested</code> with <code>{dirty:false}</code>, or the user confirmed discarding
+      changes. With <code>present(from:)</code> the SDK also dismisses itself; in every other hosting
+      arrangement, dismissing is your job.
+    </p>
+
+    <h3 id="ios-swiftui"><code>AmthalPortalView</code> (SwiftUI)</h3>
+
+<pre class="code"><code>public init(
+    config: PortalConfig,
+    request: PortalRequest,
+    auth: PortalAuth,
+    onReady: ((String) -&gt; Void)? = nil,
+    onSubmitted: ((FormSubmitResult) -&gt; Void)? = nil,
+    onCancelled: (() -&gt; Void)? = nil,
+    onError: ((PortalError) -&gt; Void)? = nil,
+    onNavigate: ((String, String?) -&gt; Void)? = nil,
+    onCloseRequested: (() -&gt; Void)? = nil,
+    onOpenExternal: ((URL) -&gt; Bool)? = nil
+)</code></pre>
+
+    <p>
+      A <code>UIViewControllerRepresentable</code> that diffs <code>auth</code> and the appearance
+      fields of <code>config</code> across view updates and forwards the changes via
+      <code>updateAuth</code> / <code>updateConfigure</code> — so re-rendering with a fresh token is all
+      it takes to refresh a session. It deliberately does not dismiss anything: the SwiftUI host owns
+      dismissal through <code>onCloseRequested</code>.
+    </p>
+
+    <p>
+      Constants: <code>AmthalPortalSDK.version</code> (<code>"1.0.0"</code>) and
+      <code>AmthalPortalSDK.protocolVersion</code>. The package ships localized strings for
+      <code>en</code> and <code>ar</code>.
+    </p>
+  </section>
+
+  <!-- ============================================================ ANDROID -->
+  <section id="android" aria-labelledby="android-h">
+    <h2 id="android-h">5. Android — <code>com.amthalgroup:portal-sdk:1.0.0</code></h2>
+
+    <p>
+      A Kotlin library: <code>minSdk 24</code>, <code>compileSdk 35</code>, Java/JVM 17. The Gradle
+      wrapper is committed and pinned (8.9, with a distribution checksum), so a clean clone builds with
+      <code>./gradlew :portal-sdk:assembleRelease</code> from the <code>android/</code> directory; the
+      AAR lands under <code>android/portal-sdk/build/outputs/aar/</code>.
+    </p>
+
+    <p>
+      Three entry points, in increasing order of control: <code>PortalFormActivity</code> (start it and
+      forget it), <code>PortalFormFragment</code> (inside your own navigation graph) and
+      <code>AmthalPortalView</code> (a plain <code>FrameLayout</code> you place anywhere).
+    </p>
+
+    <h3 id="android-config"><code>PortalConfig</code></h3>
+
+<pre class="code"><code>data class PortalConfig(
+    val baseUrl: String,
+    val locale: PortalLocale = PortalLocale.EN,
+    val theme: PortalTheme = PortalTheme.SYSTEM,
+    val fontScale: Float = 1f,
+    @ColorInt val brandColor: Int? = null,
+    val minPortalVersion: String? = null,
+    val allowedOrigins: Set&lt;String&gt; = emptySet(),
+    val certificatePinner: ((X509Certificate) -&gt; Boolean)? = null,
+    val enableLogging: Boolean = false,
+    val allowInsecureHttp: Boolean = false
+)</code></pre>
+
+    <div class="callout callout--warn">
+      <p>
+        <strong>The constructor throws <code>IllegalArgumentException</code>.</strong> It rejects
+        <code>fontScale &lt;= 0</code>, a <code>baseUrl</code> with no scheme or no host, a non-HTTPS
+        URL whose host is not a loopback address (<code>localhost</code>, <code>127.0.0.1</code>,
+        <code>10.0.2.2</code>, <code>::1</code>) unless <code>allowInsecureHttp</code> is set, and —
+        uniquely among the four platforms — <strong>a <code>baseUrl</code> carrying a query string or a
+        fragment</strong>. Build your config where you can catch that, not inside
+        <code>onCreate</code>'s happy path.
+      </p>
+    </div>
+
+    <p>
+      Computed members you can rely on: <code>origin</code> (scheme, host and non-default port, no
+      path), <code>basePath</code> (<code>""</code> at the root, <code>/portal</code> for a prefixed
+      deploy), <code>normalizedBaseUrl</code> (trailing slashes stripped — the string all portal URLs
+      are concatenated onto) and <code>allowedHosts</code>. Methods:
+      <code>isUrlOriginAllowed(url: String?): Boolean</code>,
+      <code>isInsecureHttpHonoured(context): Boolean</code> (true only in a debuggable app) and
+      <code>isBaseUrlTransportAllowed(context): Boolean</code>.
+    </p>
+
+    <p>
+      <code>certificatePinner</code> is Android-only and covers <strong>SDK-initiated HTTPS only</strong>
+      — the manifest fetch and downloads. The portal page load itself goes through the system WebView
+      network stack, which exposes no pinning hook, so pin at the network edge if you need full
+      coverage. <code>brandColor</code> tints the loading progress indicator.
+    </p>
+
+    <h3 id="android-view"><code>AmthalPortalView</code></h3>
+
+    <p>
+      A <code>FrameLayout</code> with <code>@JvmOverloads constructor(context, attrs = null, defStyleAttr = 0)</code>,
+      so it can be inflated from XML or constructed in code.
+    </p>
+
+    <table class="table">
+      <thead><tr><th scope="col">Method</th><th scope="col">Signature</th><th scope="col">Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>start</code></td><td class="api-sig">fun start(config: PortalConfig, request: PortalRequest, auth: PortalAuth, listener: AmthalPortalListener)</td><td>Fetches the manifest, runs the version gate, loads <code>baseUrl + request.toPath()</code> and performs the handshake. <strong>May be called once per view instance</strong> — a second call throws.</td></tr>
+        <tr><td><code>updateAuth</code></td><td class="api-sig">fun updateAuth(auth: PortalAuth)</td><td>Sends <code>auth</code> and dismisses the session-expired interstitial if one is showing.</td></tr>
+        <tr><td><code>updateConfigure</code></td><td class="api-sig">fun updateConfigure(locale: PortalLocale? = null, theme: PortalTheme? = null, fontScale: Float? = null)</td><td>Runtime appearance change; a <code>fontScale</code> of zero or less throws.</td></tr>
+        <tr><td><code>onBackPressed</code></td><td class="api-sig">fun onBackPressed(): Boolean</td><td><code>true</code> means a live session took the press and <code>backPressed</code> was dispatched; if the web declines (or times out at 10 s) the listener's <code>onCloseRequested</code> fires. <code>false</code> means there is no live session — apply your default.</td></tr>
+        <tr><td><code>destroy</code></td><td class="api-sig">fun destroy()</td><td>Sends <code>destroy</code>, waits up to one second for the ack, clears WebView storage and cookies (best-effort and global — the system WebView has no reliable per-origin purge) and releases the WebView.</td></tr>
+        <tr><td><code>attachActivityResultRegistry</code></td><td class="api-sig">fun attachActivityResultRegistry(registry: ActivityResultRegistry)</td><td><strong>Required for file uploads</strong> on a bare view host. Safe to call any time before the first upload; released in <code>destroy</code>.</td></tr>
+        <tr><td><code>attachActivityResultCaller</code></td><td class="api-sig">fun attachActivityResultCaller(caller: ActivityResultCaller)</td><td>Alternative wiring. Fragments must call it before creation (init / onAttach / onCreate); Activities up to onStart.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="android-hosts"><code>PortalFormActivity</code> and <code>PortalFormFragment</code></h3>
+
+<pre class="code"><code>PortalFormActivity.start(context, config, request, auth, listener)   // @JvmStatic
+fun updateAuth(auth: PortalAuth)
+
+PortalFormFragment.newInstance(config, request, auth, listener)     // @JvmStatic
+fun updateAuth(auth: PortalAuth)
+fun updateConfigure(locale: PortalLocale? = null, theme: PortalTheme? = null, fontScale: Float? = null)</code></pre>
+
+    <p>
+      Both use the same handoff: a listener is not parcelable, so the whole session is stashed in an
+      in-memory store and only a lookup key travels in the Intent or arguments. That survives
+      configuration changes but <strong>not process death</strong> — after process death the host finds
+      no session and finishes or removes itself immediately, which is the behaviour to expect when you
+      test with "Don't keep activities" enabled. <code>PortalFormActivity</code> adds
+      <code>FLAG_ACTIVITY_NEW_TASK</code> when started from a non-Activity context, routes hardware back
+      through the bridge, and finishes itself on <code>onCloseRequested</code> — but never on submit or
+      cancel. File-chooser wiring is automatic in both.
+    </p>
+
+    <h3 id="android-listener"><code>AmthalPortalListener</code></h3>
+
+<pre class="code"><code>fun onPortalReady(portalVersion: String) {}
+fun onFormSubmitted(result: FormSubmitResult)                 // no default — you must implement it
+fun onFormCancelled() {}
+fun onPortalError(error: PortalError)                         // no default — you must implement it
+fun onOpenExternal(url: String): Boolean = false              // true ⇒ you consumed the URL
+fun onNavigate(path: String, title: String?) {}
+fun onCloseRequested() {}</code></pre>
+
+    <p>
+      Everything is delivered on the main thread. <code>onFormSubmitted</code> and
+      <code>onPortalError</code> are the two members with no default body, so the compiler makes you
+      handle both a successful submission and a failure — which is the right pair to be forced into. For
+      <code>PortalErrorCode.AUTH_EXPIRED</code>, fetch a fresh token and call <code>updateAuth</code>;
+      the SDK shows an interstitial meanwhile and auto-retries retriable errors when connectivity
+      returns. Leaving <code>onOpenExternal</code> at its default fires an <code>ACTION_VIEW</code>
+      intent, which opens Custom Tabs when the default browser supports them.
+    </p>
+  </section>
+
+  <!-- ======================================================== DIFFERENCES -->
+  <section id="differences" aria-labelledby="diff-h">
+    <h2 id="diff-h">6. Cross-platform differences</h2>
+
+    <p>
+      If you ship two platforms from one spec, these are the rows that will bite. None of them is an
+      oversight you can work around by guessing the other spelling — check this table.
+    </p>
+
+    <table class="table">
+      <caption>Capability and shape differences, verified per platform</caption>
+      <thead>
+        <tr>
+          <th scope="col">Concern</th><th scope="col">React Native</th><th scope="col">Expo sheet</th>
+          <th scope="col">iOS</th><th scope="col">Android</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Form delegation (<code>onFormOp</code>)</td>
+          <td>Supported</td>
+          <td>Not supported — fails fast</td>
+          <td>Not implemented</td>
+          <td>Not implemented</td>
+        </tr>
+        <tr>
+          <td><code>brandColor</code></td>
+          <td>Splash accent and retry button</td>
+          <td><span class="badge">absent</span></td>
+          <td>Loading spinner only</td>
+          <td>Loading progress tint only</td>
+        </tr>
+        <tr>
+          <td>Anonymous session</td>
+          <td>Omit <code>auth</code> entirely</td>
+          <td colspan="3"><code>auth</code> is required; the blank-token form is what exists</td>
+        </tr>
+        <tr>
+          <td>Custom loading / error UI</td>
+          <td><code>renderLoading</code>, <code>renderError</code>, <code>PortalSplash</code></td>
+          <td colspan="3">Native interstitials only</td>
+        </tr>
+        <tr>
+          <td><code>batchID</code> / <code>headerID</code></td>
+          <td colspan="2"><code>number | string</code></td>
+          <td colspan="2"><code>String</code> only</td>
+        </tr>
+        <tr>
+          <td>User object field</td>
+          <td><code>user</code></td>
+          <td><code>user</code> (wire: <code>userJSON</code>)</td>
+          <td><code class="api-sig">userJSON</code></td>
+          <td><code class="api-sig">userJson</code></td>
+        </tr>
+        <tr>
+          <td>Cleartext dev hatch</td>
+          <td><code>allowInsecureHttp</code></td>
+          <td><code>allowInsecureHttp</code></td>
+          <td><code class="api-sig">allowInsecureHTTP</code></td>
+          <td><code>allowInsecureHttp</code></td>
+        </tr>
+        <tr>
+          <td>Certificate pinning hook</td>
+          <td colspan="3"><span class="badge">absent</span></td>
+          <td><code>certificatePinner</code> (SDK-initiated HTTPS only)</td>
+        </tr>
+        <tr>
+          <td>Invalid config surfaces as</td>
+          <td><code>onError('loadFailed')</code></td>
+          <td><code>onError('loadFailed')</code> via <code>E_CONFIG</code></td>
+          <td>A thrown <code>PortalConfigError</code></td>
+          <td>A thrown <code>IllegalArgumentException</code></td>
+        </tr>
+        <tr>
+          <td>Query string in <code>baseUrl</code></td>
+          <td colspan="3">Documented as unsupported</td>
+          <td>Rejected at construction</td>
+        </tr>
+        <tr>
+          <td><code>authExpired</code> also reported as an error</td>
+          <td>Only when <code>onAuthExpired</code> is absent</td>
+          <td>Never — its own event</td>
+          <td>Yes, alongside the overlay</td>
+          <td>Yes, with the error UI</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout--danger">
+      <p>
+        <strong>Android hardware back on React Native.</strong> Omitting <code>onCloseRequested</code>
+        does not merely skip a callback — the SDK installs no back handler at all, and the platform
+        default applies, so back can pop your navigator out from under a half-filled form. Supply it on
+        every screen that embeds the portal.
+      </p>
+    </div>
+
+    <p>
+      Two behaviours are identical everywhere and worth stating once more, because integrations
+      routinely assume the opposite: <strong>the SDK never auto-closes on submit</strong>, and
+      <strong>credentials never travel in a URL</strong> — only in <code>init</code> and
+      <code>auth</code> bridge payloads. If you find yourself putting a token in a path or query, stop:
+      the bridge already carries it.
+    </p>
+  </section>
+
+  <p class="footnote">
+    Every class, method, property and default on this page was read from the SDK source. Where the
+    source's own documentation comments disagree with its behaviour, the behaviour is documented here
+    and the discrepancy is noted inline.
+  </p>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap site-footer__inner">
+    <img src="assets/img/amthal-logo-white.svg" alt="Amthal Group" height="34">
+    <p>Amthal Portal SDK 1.0.0 — Amthal Bridge Protocol v1. Built and maintained by Amthal Group.</p>
+    <p><a href="https://github.com/Amthal-Group/amthal-portal-sdk">github.com/Amthal-Group/amthal-portal-sdk</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

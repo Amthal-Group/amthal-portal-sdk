@@ -49,7 +49,7 @@ Peer dependencies: `react >= 18`, `react-native >= 0.72`, `react-native-webview 
 import { AmthalPortalForm } from '@amthal-group/portal-react-native';
 
 <AmthalPortalForm
-  config={{ baseUrl: 'https://portal.example.com', locale: 'en', theme: 'system' }}
+  config={{ baseUrl: 'https://portal.example.com/portal', locale: 'en', theme: 'system' }}
   auth={{ token: session.token, branchId: session.branchId }}
   request={{ kind: 'newApplication', type: 'external', productID: 42 }}
   onSubmitted={(result) => navigation.goBack()}
@@ -77,6 +77,7 @@ The component handles the whole lifecycle for you: manifest version-gate → Web
 | `onOpenExternal` | `(url: string) => boolean` | | Intercept external links. Return `true` = handled; otherwise the SDK calls `Linking.openURL(url)`. |
 | `onDownloadRequest` | `(d: DownloadRequestPayload) => void` | | Handle portal file downloads (`{url, filename?, mime?, headers?}`). Default: `Linking.openURL(url)` — see limitations below. |
 | `onNavigate` | `(nav: NavigatePayload) => void` | | Informational; fired on every portal navigation inside `/embed/*` (`{path, title?}`). Useful for header titles. |
+| `onFormOp` | `(req: FormOpRequestPayload) => Promise<unknown>` | | **Form delegation (SPEC §4.1).** When set, `init` declares `formDelegation: true` and the portal routes every form data op (schema fetch, validate, submit, …) here instead of its own HTTP endpoints — the host calls its own API plane with its own identity (e.g. backoffice `/DMS/Forms/*` + staff token + pre-entrance checks) and resolves with the raw response body. Reject to surface an error in the portal; throw `{status: 401}` to trigger the auth-expired flow. Multipart bodies arrive as ordered `entries` (`{key,value}` / `{key,file:{name,type,dataBase64}}`). |
 | `onCloseRequested` | `() => void` | | Android hardware back was **not** consumed by the web form (or timed out) — close your screen. Without this handler the SDK does not intercept the back button at all. |
 | `style` | `StyleProp<ViewStyle>` | | Container style (defaults to `flex: 1`). |
 | `renderLoading` | `() => ReactElement` | | Custom loading UI (shown until `ready`). |
@@ -86,13 +87,14 @@ The component handles the whole lifecycle for you: manifest version-gate → Web
 
 | Field | Type | Description |
 |---|---|---|
-| `baseUrl` | `string` | Portal origin, e.g. `https://portal.example.com`. HTTPS required (`http://localhost` allowed for dev). |
+| `baseUrl` | `string` | Portal base URL — origin **plus the deploy path prefix**, e.g. `https://portal.example.com/portal`. Dropping the prefix is the most common integration mistake: the first in-portal navigation looks off-subtree and the user lands in the system browser. HTTPS required (`http://localhost` allowed for dev). |
 | `locale` | `'en' \| 'ar'` | Portal UI locale (`ar` flips document direction). |
 | `theme` | `'light' \| 'dark' \| 'system'` | Portal theme; also drives the SDK's own overlays. |
 | `fontScale` | `number` | `1.0` = default; maps to a root font-size adjustment. |
 | `minPortalVersion` | `string` | Fail with `versionIncompatible` when the portal is older. |
 | `allowedOrigins` | `string[]` | Extra origins allowed for main-frame navigation (rare). |
 | `enableLogging` | `boolean` | Forward portal `log` messages to the console — **dev builds only**; always dropped in release per SPEC. |
+| `allowInsecureHttp` | `boolean` | **Dev builds only**: permit a plain-`http://` `baseUrl` on a non-localhost host (portal dev server bound to a tenant hostname, e.g. `http://portal-dev.example.com:4200/portal`, so the backend can resolve the tenant from the request host/referer). Ignored in release builds. On iOS the host app also needs an ATS exception for the dev domain. |
 
 ### Imperative handle (`ref`)
 

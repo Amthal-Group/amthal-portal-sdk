@@ -12,10 +12,10 @@ dependencyResolutionManagement {
     repositories {
         google(); mavenCentral()
         maven {
-            url = uri("https://maven.pkg.github.com/amthal-group/portal-sdk")
+            url = uri("https://maven.pkg.github.com/Amthal-Group/amthal-portal-sdk")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
-                password = providers.gradleProperty("gpr.token").orNull ?: System.getenv("GITHUB_TOKEN")
+                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }
@@ -27,7 +27,8 @@ dependencies {
 }
 ```
 
-> This repo ships no Gradle wrapper. To build locally, run `gradle wrapper --gradle-version 8.9` once (AGP 8.7 needs Gradle ≥ 8.9), then `./gradlew :portal-sdk:assembleRelease`.
+> To build from source: `./gradlew :portal-sdk:assembleRelease` — the wrapper is committed and pinned to Gradle 8.9 (AGP 8.7 needs ≥ 8.9), with the distribution checksum, so no global Gradle install is required. The AAR lands in `portal-sdk/build/outputs/aar/`.
+> Needs **JDK 17** (AGP 8.7 refuses to run on 11) and an Android SDK — either `ANDROID_HOME` in the environment or `sdk.dir` in `android/local.properties`, which is deliberately git-ignored.
 > To publish: set `GITHUB_ACTOR` / `GITHUB_TOKEN` (and optionally `GITHUB_MAVEN_URL` to override the repo URL) and run `./gradlew :portal-sdk:publishReleasePublicationToGitHubPackagesRepository`.
 
 ## Quickstart
@@ -36,10 +37,10 @@ dependencies {
 
 ```kotlin
 val config = PortalConfig(
-    baseUrl = "https://portal.example.com",   // https required (http only for localhost/10.0.2.2)
+    baseUrl = "https://portal.example.com/portal",  // INCLUDE the deploy path prefix; https required (http only for localhost/10.0.2.2)
     locale = PortalLocale.AR,
     theme = PortalTheme.SYSTEM,
-    minPortalVersion = "1.3.0",               // optional version-handshake floor
+    minPortalVersion = null,                  // optional floor — set it to the OLDEST portal you support
 )
 val auth = PortalAuth(token = backendBearerToken, branchId = "12")
 val request = PortalRequest.NewApplication(type = "external", productID = 42)

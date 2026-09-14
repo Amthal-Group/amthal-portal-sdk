@@ -91,6 +91,7 @@ export type WebToNativeType =
   | 'navigate' // informational route change inside /embed/*
   | 'openExternal' // host should open URL outside the WebView
   | 'downloadRequest' // host should download + natively preview a file
+  | 'formOp' // form-delegation data op; host replies ack {FormOpResponsePayload}
   | 'haptic'
   | 'log'
   | 'ack';
@@ -145,6 +146,12 @@ export interface InitPayload {
   protocolVersion: number;
   configure: ConfigurePayload;
   auth: AuthPayload;
+  /**
+   * Host owns the form data plane: the portal routes every FormsService op
+   * through `formOp` bridge requests instead of its own HTTP endpoints.
+   * Additive protocol-v1 capability — absent/false keeps legacy behavior.
+   */
+  formDelegation?: boolean;
 }
 
 export interface ReadyPayload {
@@ -208,6 +215,60 @@ export interface DismissStatePayload {
 export interface AckPayload {
   ok: boolean;
   error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Form delegation (host-mediated form data plane)
+//
+// When the host declares `formDelegation: true` in `init`, the portal stops
+// calling its own form HTTP endpoints inside /embed and instead sends every
+// data operation as a `formOp` request; the host performs it against whatever
+// API/plane/identity it owns (e.g. backoffice /DMS/Forms/* with a staff
+// token, plus any per-login pre-entrance checks) and replies with the raw
+// response body the portal's HTTP client would have received. The portal
+// stays a pure renderer — no identity or plane logic in the web code.
+// ---------------------------------------------------------------------------
+
+/** Data operations the portal can delegate. Mirrors the portal `FormsApi`. */
+export type FormOp =
+  | 'getCategories'
+  | 'getFormSchema'
+  | 'getFormFields'
+  | 'validateForm'
+  | 'submitForm'
+  | 'getWorkflowDetails'
+  | 'submitFinalApproval'
+  | 'submitForApproval';
+
+/** One entry of a serialized multipart body: plain field or base64 file. */
+export type SerializedFormEntry =
+  | { key: string; value: string }
+  | { key: string; file: { name: string; type: string; dataBase64: string } };
+
+export interface FormOpRequestPayload {
+  op: FormOp;
+  /**
+   * Route/product params the portal knows (productID, batchID, headerID,
+   * workflowDetailID, isEdit, ...) as strings. The host augments them with
+   * identity (userID / branch / token) and chooses the endpoint — the portal
+   * never sends identity here.
+   */
+  params: Record<string, string>;
+  /** Serialized multipart body for validateForm / submitForm. */
+  entries?: SerializedFormEntry[];
+  /** JSON body for ops that post JSON (submitForApproval). */
+  body?: unknown;
+}
+
+/** ack replying to `formOp`. */
+export interface FormOpResponsePayload {
+  ok: boolean;
+  /** Raw response body, exactly as the portal's HTTP layer would parse it. */
+  body?: unknown;
+  /** Human-readable error when ok=false (surfaced to the portal UI). */
+  error?: string;
+  /** Optional HTTP status for error mapping (401 triggers authExpired flow). */
+  status?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +345,10 @@ export const TIMINGS = {
   initTimeoutMs: 10_000,
   /** Default timeout for any request/ack round-trip. */
   requestTimeoutMs: 10_000,
+  /** Timeout for delegated form reads (`formOp` getFormFields etc.). */
+  formOpTimeoutMs: 20_000,
+  /** Timeout for delegated form writes (validate/submit, may carry files). */
+  formSubmitTimeoutMs: 90_000,
 } as const;
 
 /** Compares dotted versions; returns -1 | 0 | 1. */

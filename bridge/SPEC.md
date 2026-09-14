@@ -97,6 +97,7 @@ native                                   web (portal)
 | `navigate` | W→N | `NavigatePayload` | Informational; fired on every router navigation within `/embed/*`. |
 | `openExternal` | W→N | `OpenExternalPayload` | Host SHOULD open in system browser / SFSafariViewController / Custom Tabs unless it intercepts. |
 | `downloadRequest` | W→N | `DownloadRequestPayload` | Native downloads (attaching `headers`) and presents a native preview (QuickLook / ACTION_VIEW). Native MUST NOT log the header values. |
+| `formOp` | W→N | `FormOpRequestPayload` | Form delegation (§4.1). Host MUST reply `ack`-style with `FormOpResponsePayload` within `formOpTimeoutMs` (reads) / `formSubmitTimeoutMs` (validate/submit). Only sent when `init.formDelegation === true`. |
 | `haptic` | W→N | `HapticPayload` | Optional; natives MAY ignore. |
 | `log` | W→N | `LogPayload` | Diagnostics; natives MUST drop in release builds. |
 | `backPressed` | N→W | — | Android hardware back. Web MUST reply `ack`-style with `BackHandledPayload` (`{handled:true}` = web consumed it, e.g. went back a form step; `{handled:false}` = native should close/dismiss). Web MUST answer within `requestTimeoutMs`; on timeout native treats it as `{handled:false}`. |
@@ -104,12 +105,43 @@ native                                   web (portal)
 | `destroy` | N→W | — | §3 teardown. |
 | `ack` | both | `AckPayload` or the typed reply payloads above | Always carries `replyTo`. |
 
+### 4.1 Form delegation (`init.formDelegation`)
+
+Additive protocol-v1 capability for hosts that own the form data plane (e.g. a
+backoffice app whose staff identity must hit `/DMS/Forms/*` with per-login
+pre-entrance checks the portal must not know about).
+
+- The host opts in by sending `formDelegation: true` in `init`. Absent/false ⇒
+  the portal calls its own HTTP endpoints as before (customer plane).
+- When active, the portal MUST NOT call its form HTTP endpoints inside
+  `/embed/*`; every data operation is sent as a `formOp` request whose `op`
+  mirrors the portal `FormsApi` method (`getCategories`, `getFormSchema`,
+  `getFormFields`, `validateForm`, `submitForm`, `getWorkflowDetails`,
+  `submitFinalApproval`, `submitForApproval`).
+- `getFormSchema` returns the whole render shape in one call — header fields
+  inline (`isHeader`) and subforms on `headerJsonControls` — which
+  `getFormFields` and the former `getProductFieldsTemplates` op returned
+  separately. Hosts MUST NOT expect a second templates call.
+- `params` carries only route/product values (productID, batchID, headerID,
+  workflowDetailID, isEdit, …). The portal MUST NOT send identity (userID,
+  token, branch) in `params` — the host owns identity and augments the call.
+- Multipart bodies (validate/submit) cross as `entries`: ordered
+  `{key,value}` pairs plus `{key,file:{name,type,dataBase64}}` for binary
+  parts. The host MUST rebuild the multipart body preserving entry order and
+  duplicate keys.
+- The host replies `ack` with `FormOpResponsePayload`: `ok:true` + `body`
+  (the raw response body the portal's HTTP client would have parsed), or
+  `ok:false` + `error` (+ optional `status`). A `status` of `401` MUST make
+  the portal run its embedded auth-expired flow (`authExpired` → host `auth`).
+- Timeout or missing reply ⇒ the portal surfaces a generic load/submit error;
+  it MUST NOT fall back to its own HTTP endpoints while delegation is active.
+
 ## 5. Version handshake (manifest)
 
 Before loading any route, native MUST `GET {baseURL}/embed/manifest.json` (no auth; `{baseURL}` includes any deploy path prefix — never fetch from the bare origin):
 
 ```json
-{ "portalVersion": "1.3.0", "bridgeProtocolVersion": 1, "minSdkVersion": "1.0.0" }
+{ "portalVersion": "1.8.0", "bridgeProtocolVersion": 1, "minSdkVersion": "1.0.0" }
 ```
 
 Gate rules (any failure ⇒ `versionIncompatible`, except network failure ⇒ `manifestFailed`):

@@ -30,6 +30,7 @@ export interface NativePresentOptions {
     minPortalVersion?: string;
     allowedOrigins?: string[];
     enableLogging?: boolean;
+    allowInsecureHttp?: boolean;
   };
   request: {
     kind?: string;
