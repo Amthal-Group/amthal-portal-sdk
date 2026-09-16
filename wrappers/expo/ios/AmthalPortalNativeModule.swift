@@ -210,7 +210,8 @@ public final class AmthalPortalNativeModule: Module {
                 productID: productID,
                 batchID: stringValue(dict["batchID"]) ?? "0",
                 headerID: stringValue(dict["headerID"]) ?? "0",
-                readOnly: dict["readOnly"] as? Bool ?? false
+                readOnly: dict["readOnly"] as? Bool ?? false,
+                workflowDetailID: stringValue(dict["workflowDetailID"])
             )
         case "path":
             guard let path = dict["path"] as? String else {

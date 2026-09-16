@@ -7,12 +7,18 @@ public enum PortalRequest: Equatable, Sendable {
     case newApplication(type: String, productID: Int)
 
     /// `embed/form/:type/:productID/:batchID/:headerID/:readOnly`
+    ///
+    /// `workflowDetailID` is the workflow step the form is opened at. It travels as a QUERY
+    /// parameter rather than a path segment so the portal's two form routes keep matching, and is
+    /// omitted when absent or `"0"` — the portal's own "no workflow step" default — so an ordinary
+    /// form produces exactly the URL it always did.
     case existingApplication(
         type: String,
         productID: Int,
         batchID: String,
         headerID: String,
-        readOnly: Bool
+        readOnly: Bool,
+        workflowDetailID: String? = nil
     )
 
     /// Generic escape hatch: any path under /embed (leading slash optional).
@@ -24,9 +30,11 @@ public enum PortalRequest: Equatable, Sendable {
         case let .newApplication(type, productID):
             return "\(BridgeProtocol.embedPathPrefix)/form/\(Self.encodeURIComponent(type))/\(productID)"
 
-        case let .existingApplication(type, productID, batchID, headerID, readOnly):
-            return "\(BridgeProtocol.embedPathPrefix)/form/\(Self.encodeURIComponent(type))/\(productID)"
+        case let .existingApplication(type, productID, batchID, headerID, readOnly, workflowDetailID):
+            let base = "\(BridgeProtocol.embedPathPrefix)/form/\(Self.encodeURIComponent(type))/\(productID)"
                 + "/\(batchID)/\(headerID)/\(readOnly)"
+            guard let detail = workflowDetailID, !detail.isEmpty, detail != "0" else { return base }
+            return base + "?workflowDetailID=\(Self.encodeURIComponent(detail))"
 
         case let .path(rawPath):
             let p = rawPath.hasPrefix("/") ? rawPath : "/\(rawPath)"

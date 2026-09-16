@@ -82,6 +82,26 @@ native                                   web (portal)
 
 **Teardown:** native sends `destroy`, waits up to 1 s for `ack` (best-effort), then releases the WebView. Web clears persisted auth on `destroy` regardless of ack delivery.
 
+### 3.1 Route requests (`requestToPath`)
+
+What the host wants shown is expressed as a `PortalFormRequest` and carried entirely by the URL the native side loads. Credentials MUST NOT appear in it.
+
+| Request | Path |
+|---|---|
+| `{ kind: 'newApplication', type, productID }` | `{basePath}/embed/form/:type/:productID` |
+| `{ kind: 'existingApplication', type, productID, batchID, headerID, readOnly }` | `{basePath}/embed/form/:type/:productID/:batchID/:headerID/:readOnly` |
+| `{ kind: 'path', path }` | `{basePath}` + path, `/embed` prefixed when missing |
+
+**`workflowDetailID` (optional, `existingApplication` only).** A document opened from an approval inbox is opened AT a workflow detail, which selects the field template the current signatory sees. Hosts MAY supply it as `workflowDetailID: number | string`; it travels as a **query parameter**, never as a path segment:
+
+```
+{basePath}/embed/form/:type/:productID/:batchID/:headerID/:readOnly?workflowDetailID=<value>
+```
+
+- The parameter MUST be URL-encoded, and MUST be omitted entirely when the value is absent, empty, or `0` — `0` is the portal's own "no workflow detail" default, so a request without a workflow detail MUST produce the exact path it produced before this field existed.
+- A portal that binds the parameter uses it to resolve the signatory's field template (and, under delegation, sends it in `formOp.params`); one that does not simply never reads it — an Angular route ignores a query parameter no component binds, so no rule is needed to make this safe.
+- This is why it is a query parameter rather than a path segment: the portal's existing two form routes keep matching unchanged, and an older portal ignores an unknown query parameter. The change is therefore additive and stays within **protocol version 1** (§5) — no host, portal or native SDK needs to change to keep working.
+
 ## 4. Message semantics
 
 | Type | Dir | Payload | Behavior |
@@ -123,7 +143,7 @@ pre-entrance checks the portal must not know about).
   `getFormFields` and the former `getProductFieldsTemplates` op returned
   separately. Hosts MUST NOT expect a second templates call.
 - `params` carries only route/product values (productID, batchID, headerID,
-  workflowDetailID, isEdit, …). The portal MUST NOT send identity (userID,
+  workflowDetailID (§3.1), isEdit, …). The portal MUST NOT send identity (userID,
   token, branch) in `params` — the host owns identity and augments the call.
 - Multipart bodies (validate/submit) cross as `entries`: ordered
   `{key,value}` pairs plus `{key,file:{name,type,dataBase64}}` for binary

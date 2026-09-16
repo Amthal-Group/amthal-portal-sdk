@@ -19,7 +19,7 @@
  * });
  * // later: session.updateAuth({ token: fresh }); session.dismiss();
  */
-import PortalNative from './AmthalPortalNativeModule';
+import PortalNative, { isPortalSheetAvailable } from './AmthalPortalNativeModule';
 import type { NativeAuth } from './AmthalPortalNativeModule';
 import type {
   PortalAuthState,
@@ -42,7 +42,30 @@ function toNativeAuth(auth: PortalAuthState): NativeAuth {
  * auth / config and dismissing. Event listeners are torn down automatically
  * when the sheet closes.
  */
+const NO_SESSION: PortalSheetSession = {
+  updateAuth: () => undefined,
+  configure: () => undefined,
+  dismiss: () => undefined,
+};
+
+export { isPortalSheetAvailable };
+
 export function presentPortalSheet(options: PresentPortalSheetOptions): PortalSheetSession {
+  // Apple platforms only. Reported through onError rather than thrown, so a cross-platform app
+  // that calls this without a platform check gets a handled error on Android instead of an
+  // unhandled exception, and the same handler already wired for every other failure sees it.
+  if (!isPortalSheetAvailable()) {
+    queueMicrotask(() =>
+      options.onError?.({
+        code: 'loadFailed',
+        message:
+          'The native portal sheet is available on iOS only. On Android, render the inline ' +
+          '<AmthalPortalForm /> from @amthal-group/portal-react-native instead.',
+      }),
+    );
+    return NO_SESSION;
+  }
+
   // Form delegation is not wired through the native sheet yet (SPEC §4.1).
   // Failing fast beats silently letting the portal hit its own endpoints
   // with an identity that belongs on a different API plane.
@@ -54,7 +77,7 @@ export function presentPortalSheet(options: PresentPortalSheetOptions): PortalSh
           'presentPortalSheet does not support form delegation (onFormOp) yet — use the inline AmthalPortalForm instead.',
       }),
     );
-    return { updateAuth: () => undefined, configure: () => undefined, dismiss: () => undefined };
+    return NO_SESSION;
   }
 
   const subscriptions: Array<{ remove: () => void }> = [];

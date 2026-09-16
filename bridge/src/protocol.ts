@@ -284,6 +284,13 @@ export type PortalFormRequest =
       batchID: number | string;
       headerID: number | string;
       readOnly: boolean;
+      /**
+       * Workflow detail the document is being opened at, when it comes from an
+       * approval inbox: it selects which field template the CURRENT signatory
+       * sees. Travels as a QUERY parameter (see requestToPath) so the portal's
+       * existing routes keep matching and an older portal ignores it.
+       */
+      workflowDetailID?: number | string;
     }
   /** Generic escape hatch: any path under /embed (leading slash optional). */
   | { kind: 'path'; path: string };
@@ -297,11 +304,17 @@ export function requestToPath(request: PortalFormRequest): string {
   switch (request.kind) {
     case 'newApplication':
       return `${EMBED_PATH_PREFIX}/form/${encodeURIComponent(request.type)}/${request.productID}`;
-    case 'existingApplication':
-      return (
+    case 'existingApplication': {
+      const path =
         `${EMBED_PATH_PREFIX}/form/${encodeURIComponent(request.type)}/${request.productID}` +
-        `/${request.batchID}/${request.headerID}/${request.readOnly}`
-      );
+        `/${request.batchID}/${request.headerID}/${request.readOnly}`;
+      // '0' is the portal's own "no workflow detail" default, so it is dropped
+      // like an absent value — every ordinary form keeps the bare legacy path.
+      const detail = String(request.workflowDetailID ?? '').trim();
+      return !detail || detail === '0'
+        ? path
+        : `${path}?workflowDetailID=${encodeURIComponent(detail)}`;
+    }
     case 'path': {
       const p = request.path.startsWith('/') ? request.path : `/${request.path}`;
       return p.startsWith(EMBED_PATH_PREFIX) ? p : `${EMBED_PATH_PREFIX}${p}`;

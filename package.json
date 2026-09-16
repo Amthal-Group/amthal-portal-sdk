@@ -9,7 +9,7 @@
     "wrappers/expo"
   ],
   "scripts": {
-    "build": "npm run build:bridge",
+    "build": "npm run build:bridge && npm run vendor:ios -w @amthal-group/portal-expo",
     "build:bridge": "npm run build -w @amthal-group/portal-bridge",
     "typecheck": "npm run typecheck -w @amthal-group/portal-bridge && npm run typecheck -w @amthal-group/portal-react-native && npm run typecheck -w @amthal-group/portal-expo"
   },

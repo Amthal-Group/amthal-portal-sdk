@@ -960,7 +960,11 @@ Everything below is the React Native surface (`@amthal-group/portal-react-native
 type PortalFormRequest =
   | { kind: 'newApplication'; type: string; productID: number }
   | { kind: 'existingApplication'; type: string; productID: number;
-      batchID: number | string; headerID: number | string; readOnly: boolean }
+      batchID: number | string; headerID: number | string; readOnly: boolean;
+      /** Workflow step the form is opened at — selects the signatory's field
+       *  template. Sent as a query parameter; omit it (or pass 0) when the form
+       *  is not being opened from an approval inbox. */
+      workflowDetailID?: number | string }
   | { kind: 'path'; path: string };   // any /embed/… route; leading slash optional
 ```
 

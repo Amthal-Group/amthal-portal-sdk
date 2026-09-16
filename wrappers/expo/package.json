@@ -15,7 +15,8 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "prepack": "rm -rf ios/Generated && mkdir -p ios/Generated && cp -R ../../ios/Sources/AmthalPortal/. ios/Generated/"
+    "prepack": "npm run vendor:ios",
+    "vendor:ios": "rm -rf ios/Generated && mkdir -p ios/Generated && cp -R ../../ios/Sources/AmthalPortal/. ios/Generated/"
   },
   "keywords": [
     "amthal",

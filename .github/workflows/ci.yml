@@ -35,6 +35,20 @@ jobs:
       # destination. swift build targets the host and fails with "no such module 'UIKit'".
       - run: xcodebuild -scheme AmthalPortal -destination 'generic/platform=iOS' build
 
+      # The Expo module does not compile ios/Sources directly — CocoaPods cannot reference sources
+      # outside a pod's own directory, so the podspec builds a COPY under wrappers/expo/ios/Generated.
+      # Nothing refreshes that copy on its own: `prepare_command` is skipped for local path pods, so
+      # a Swift change here leaves the copy behind and the only symptom is a failed release archive,
+      # long after the change. `npm run build` re-vendors it; this proves it stayed in step.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Vendored Expo copy matches the Swift source
+        run: diff -r ios/Sources/AmthalPortal wrappers/expo/ios/Generated
+
   android:
     name: Android SDK
     runs-on: ubuntu-latest

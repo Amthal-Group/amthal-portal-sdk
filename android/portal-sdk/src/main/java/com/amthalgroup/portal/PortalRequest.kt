@@ -14,13 +14,21 @@ sealed class PortalRequest {
         val productID: Int
     ) : PortalRequest()
 
-    /** `/embed/form/:type/:productID/:batchID/:headerID/:readOnly` — an existing application. */
+    /**
+     * `/embed/form/:type/:productID/:batchID/:headerID/:readOnly` — an existing application.
+     *
+     * [workflowDetailID] is the workflow step the form is opened at. It travels as a QUERY
+     * parameter rather than a path segment so the portal's two form routes keep matching, and is
+     * omitted when null, blank or `"0"` — the portal's own "no workflow step" default — so an
+     * ordinary form produces exactly the URL it always did.
+     */
     data class ExistingApplication(
         val type: String,
         val productID: Int,
         val batchID: String,
         val headerID: String,
-        val readOnly: Boolean
+        val readOnly: Boolean,
+        val workflowDetailID: String? = null
     ) : PortalRequest()
 
     /** Generic escape hatch: any path under `/embed` (leading slash optional). */
@@ -35,8 +43,11 @@ sealed class PortalRequest {
     fun toPath(): String = when (this) {
         is NewApplication ->
             "$EMBED_PATH_PREFIX/form/${Uri.encode(type)}/$productID"
-        is ExistingApplication ->
-            "$EMBED_PATH_PREFIX/form/${Uri.encode(type)}/$productID/$batchID/$headerID/$readOnly"
+        is ExistingApplication -> {
+            val base = "$EMBED_PATH_PREFIX/form/${Uri.encode(type)}/$productID/$batchID/$headerID/$readOnly"
+            if (workflowDetailID.isNullOrBlank() || workflowDetailID == "0") base
+            else "$base?workflowDetailID=${Uri.encode(workflowDetailID)}"
+        }
         is Path -> {
             val p = if (path.startsWith("/")) path else "/$path"
             if (p.startsWith(EMBED_PATH_PREFIX)) p else "$EMBED_PATH_PREFIX$p"

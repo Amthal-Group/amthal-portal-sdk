@@ -1,4 +1,4 @@
-import { NativeModule, requireNativeModule } from 'expo-modules-core';
+import { NativeModule, requireOptionalNativeModule } from 'expo-modules-core';
 
 import type { FormSubmitResult, PortalErrorInfo } from './types';
 
@@ -56,4 +56,23 @@ declare class AmthalPortalNativeModule extends NativeModule<PortalNativeEventsMa
   dismiss(): void;
 }
 
-export default requireNativeModule<AmthalPortalNativeModule>('AmthalPortalNative');
+/**
+ * The native sheet exists only on Apple platforms — the module declares iOS as its only platform,
+ * and on Android the inline `AmthalPortalForm` from `@amthal-group/portal-react-native` is the
+ * supported host.
+ *
+ * `requireNativeModule` throws during module evaluation when the native side is absent, so on
+ * Android merely IMPORTING this package took the whole app down before any of its own code ran —
+ * including apps that import it correctly and only ever call it behind a platform check. The
+ * optional variant returns null instead, which moves the failure to the point of use where it can
+ * be reported through the caller's own error handling.
+ */
+export const PortalNativeOptional =
+  requireOptionalNativeModule<AmthalPortalNativeModule>('AmthalPortalNative');
+
+/** Whether the native sheet can be presented on this platform and build. */
+export function isPortalSheetAvailable(): boolean {
+  return PortalNativeOptional != null;
+}
+
+export default PortalNativeOptional as AmthalPortalNativeModule;
