@@ -71,6 +71,10 @@ export interface WebBridge {
   onAny(handler: MessageHandler): () => void;
 }
 
+/** Envelopes held for a not-yet-attached typed handler. Boot needs a handful, never more. */
+const MAX_PRE_LISTENER_BUFFER = 64;
+
+let warnedVersionMismatch = false;
 let counter = 0;
 function newId(): string {
   // uuid-ish without a crypto dependency; uniqueness only matters per session.
@@ -101,12 +105,28 @@ export function createWebBridge(): WebBridge {
       return;
     }
     const set = handlers.get(envelope.type);
-    if ((!set || set.size === 0) && anyHandlers.size === 0) {
-      preListenerBuffer.push(envelope);
+    // Diagnostics observers never affect delivery. Buffering keyed off `anyHandlers` as well
+    // meant one `onAny` subscriber stopped an unhandled message being held — so an `init`
+    // that landed before the typed listener attached reached the logger and nothing else,
+    // and the portal waited out its handshake for a message it had already been sent.
+    anyHandlers.forEach((h) => h(envelope));
+    if (set && set.size > 0) {
+      set.forEach((h) => h(envelope));
       return;
     }
-    set?.forEach((h) => h(envelope));
-    anyHandlers.forEach((h) => h(envelope));
+    // A correlated reply whose request is gone — it timed out, or the host answered twice.
+    // Nothing subscribes to 'ack' by type, so buffering these grew the queue for the life of
+    // the session, and a `formOp` reply can carry an entire form schema.
+    if (envelope.replyTo) {
+      return;
+    }
+    // The buffer exists to cover the gap before listeners attach, not to be a queue. If it is
+    // still filling long after boot, something is sending a type nobody handles — drop the
+    // oldest rather than grow without bound.
+    if (preListenerBuffer.length >= MAX_PRE_LISTENER_BUFFER) {
+      preListenerBuffer.shift();
+    }
+    preListenerBuffer.push(envelope);
   }
 
   window.__amthalReceive = (raw: string) => {
@@ -116,12 +136,36 @@ export function createWebBridge(): WebBridge {
     } catch {
       return; // malformed input from outside the protocol — ignore
     }
-    if (!envelope || envelope.v !== BRIDGE_PROTOCOL_VERSION || typeof envelope.type !== 'string') return;
+    if (!envelope || typeof envelope.type !== 'string') return;
+    if (envelope.v !== BRIDGE_PROTOCOL_VERSION) {
+      // Dropping these silently makes a host one version ahead indistinguishable from a host
+      // that never connected — the same blank screen, no clue which. Say it once.
+      if (!warnedVersionMismatch) {
+        warnedVersionMismatch = true;
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[amthal-bridge] ignoring host message '${envelope.type}': protocol v${envelope.v} ` +
+            `≠ v${BRIDGE_PROTOCOL_VERSION} supported here. Update the host SDK or the portal.`
+        );
+      }
+      return;
+    }
     dispatch(envelope);
   };
 
+  let warnedNoTransport = false;
   function post(envelope: BridgeEnvelope): void {
-    transport?.post(JSON.stringify(envelope));
+    if (!transport) {
+      // `send` still returns an id, so without this a message to a host that is not there is
+      // indistinguishable from one that was delivered.
+      if (!warnedNoTransport) {
+        warnedNoTransport = true;
+        // eslint-disable-next-line no-console
+        console.warn(`[amthal-bridge] '${envelope.type}' dropped: no native host attached.`);
+      }
+      return;
+    }
+    transport.post(JSON.stringify(envelope));
   }
 
   const bridge: WebBridge = {
@@ -176,7 +220,9 @@ export function createWebBridge(): WebBridge {
 
     onAny(handler) {
       anyHandlers.add(handler);
-      preListenerBuffer.splice(0).forEach((e) => handler(e));
+      // A COPY: these are still waiting for their typed handler, and draining the buffer here
+      // would silently consume them.
+      preListenerBuffer.slice().forEach((e) => handler(e));
       return () => anyHandlers.delete(handler);
     },
   };

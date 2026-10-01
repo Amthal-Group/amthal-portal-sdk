@@ -114,7 +114,13 @@ export type MessageType = WebToNativeType | NativeToWebType;
 
 export type PortalLocale = 'en' | 'ar';
 export type PortalTheme = 'light' | 'dark' | 'system';
-export type HostPlatform = 'ios' | 'android' | 'react-native' | 'flutter';
+/**
+ * Hosts that can actually carry this protocol — each one has a transport in `detectTransport`
+ * and a wrapper in this repo. 'flutter' was listed here for a year with neither, so it type-
+ * checked everywhere and worked nowhere: a Flutter host got `embedded: false` and the portal
+ * quietly ran as a plain browser page. Add it back together with its transport and wrapper.
+ */
+export type HostPlatform = 'ios' | 'android' | 'react-native';
 
 export interface ConfigurePayload {
   locale?: PortalLocale;
@@ -145,7 +151,13 @@ export interface InitPayload {
   platform: HostPlatform;
   protocolVersion: number;
   configure: ConfigurePayload;
-  auth: AuthPayload;
+  /**
+   * Absent for an ANONYMOUS session — which is how both implementations already behave: the
+   * portal reads `init.auth?.token` and treats a missing or blank token as "no credentials",
+   * and the dev mock omits the key entirely. Declaring it required forced hosts with nothing
+   * to hand over to spell it `{ token: '' }`, and hid the omission behind a cast.
+   */
+  auth?: AuthPayload;
   /**
    * Host owns the form data plane: the portal routes every FormsService op
    * through `formOp` bridge requests instead of its own HTTP endpoints.
