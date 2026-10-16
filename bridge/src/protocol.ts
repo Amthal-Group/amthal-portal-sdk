@@ -164,6 +164,19 @@ export interface InitPayload {
    * Additive protocol-v1 capability — absent/false keeps legacy behavior.
    */
   formDelegation?: boolean;
+  /**
+   * Host draws NO navigation chrome around the WebView, so the portal must supply the back
+   * affordance itself: the form renders a back button in its own header and a press emits
+   * `formCancelled` — the same message an in-form close already sends, so a host that handles
+   * one handles both.
+   *
+   * It leaves the SCREEN; it does not step back through the form. Stepping is the form's own
+   * Prev button, and Android's hardware back via `backPressed`.
+   *
+   * Additive protocol-v1 capability — absent/false keeps legacy behavior (host header, no
+   * in-page button).
+   */
+  inPageBack?: boolean;
 }
 
 export interface ReadyPayload {

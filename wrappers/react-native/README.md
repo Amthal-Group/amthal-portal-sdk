@@ -71,7 +71,7 @@ The component handles the whole lifecycle for you: manifest version-gate → Web
 | `request` | `PortalFormRequest` | ✔ | What to open: `{kind:'newApplication', type, productID}`, `{kind:'existingApplication', …, readOnly}` or `{kind:'path', path}`. The URL is derived via `requestToPath` — never contains credentials. |
 | `onReady` | `() => void` | | Portal emitted `ready`; the loading overlay has been hidden. |
 | `onSubmitted` | `(result: FormSubmitResult) => void` | ✔ | Form submitted successfully (`{productID, applicationNo?, batchID?, headerID?, raw?}`). The SDK never auto-closes — you decide. |
-| `onCancelled` | `() => void` | ✔ | User exited via the form's own close/finish affordance. |
+| `onCancelled` | `() => void` | ✔ | User exited via the form's own close/finish affordance — including the in-page back button when `inPageBack` is set. |
 | `onError` | `(error: PortalErrorInfo) => void` | ✔ | `{code, message?, httpStatus?}` — see error codes below. |
 | `onAuthExpired` | `(refresh, reason?) => void` | | Portal token refresh failed. Fetch a fresh token, call `refresh(newAuth)`. A "refreshing session" overlay is shown until the portal acks. Without this handler, `onError({code:'authExpired'})` fires instead. |
 | `onOpenExternal` | `(url: string) => boolean` | | Intercept external links. Return `true` = handled; otherwise the SDK calls `Linking.openURL(url)`. |
@@ -79,6 +79,7 @@ The component handles the whole lifecycle for you: manifest version-gate → Web
 | `onNavigate` | `(nav: NavigatePayload) => void` | | Informational; fired on every portal navigation inside `/embed/*` (`{path, title?}`). Useful for header titles. |
 | `onFormOp` | `(req: FormOpRequestPayload) => Promise<unknown>` | | **Form delegation (SPEC §4.1).** When set, `init` declares `formDelegation: true` and the portal routes every form data op (schema fetch, validate, submit, …) here instead of its own HTTP endpoints — the host calls its own API plane with its own identity (e.g. backoffice `/DMS/Forms/*` + staff token + pre-entrance checks) and resolves with the raw response body. Reject to surface an error in the portal; throw `{status: 401}` to trigger the auth-expired flow. Multipart bodies arrive as ordered `entries` (`{key,value}` / `{key,file:{name,type,dataBase64}}`). |
 | `onCloseRequested` | `() => void` | | Android hardware back was **not** consumed by the web form (or timed out) — close your screen. Without this handler the SDK does not intercept the back button at all. |
+| `inPageBack` | `boolean` | | **In-page back (SPEC §4.2).** Your screen draws no native header, so the form renders its own back button beside the step title and a press fires `onCancelled` — nothing new to handle. Set it together with `headerShown: false`, and supply the status-bar inset yourself (`useSafeAreaInsets()`); see below. |
 | `style` | `StyleProp<ViewStyle>` | | Container style (defaults to `flex: 1`). |
 | `renderLoading` | `() => ReactElement` | | Custom loading UI (shown until `ready`). |
 | `renderError` | `({error, retry}) => ReactElement` | | Custom error UI; call `retry()` to re-run the manifest gate + reload. |
@@ -159,6 +160,37 @@ The component registers a `BackHandler` while mounted **if you pass `onCloseRequ
 ```
 
 If you omit `onCloseRequested`, the SDK does not touch the back button and the platform default (e.g. your navigator popping the screen) applies — but then the web form never gets a chance to step back internally, so passing it is recommended. For custom UI (a header ✕ button, iOS modals), call `ref.handleBackPress()` yourself and close when it resolves `false`.
+
+## Headerless screens (`inPageBack`)
+
+Give the form the whole viewport: hide your navigator's header and let the form draw the back
+button beside its step title. On a phone a native header stacked on top of the form's own head is
+two bars for one screen, and the shorter WebView is what the form then has to fit in.
+
+```tsx
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const insets = useSafeAreaInsets();
+
+<View style={{ flex: 1, paddingTop: insets.top }}>
+  <Stack.Screen options={{ headerShown: false }} />
+  <AmthalPortalForm
+    inPageBack
+    onCancelled={() => router.back()}   // the in-page button lands here
+    ...
+  />
+</View>
+```
+
+Three things to get right:
+
+- **Set `inPageBack` and `headerShown: false` together.** The SDK cannot see your navigator, so a
+  disagreement shows up as two header bars or none — never as an error.
+- **Supply the status-bar inset yourself**, as above. The portal does apply
+  `env(safe-area-inset-top)`, but an Android WebView reports that as 0. The two cannot double up:
+  padding here moves the WebView out of the unsafe area, so the portal's `env()` goes to 0 too.
+- **It leaves the screen; it does not step back through the form.** Stepping stays the form's own
+  Prev control and the Android hardware back recipe above.
 
 ## `downloadRequest` limitations
 

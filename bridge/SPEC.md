@@ -113,7 +113,7 @@ What the host wants shown is expressed as a `PortalFormRequest` and carried enti
 | `authExpired` | W→N | `AuthExpiredPayload` | §3 auth refresh. |
 | `configure` | N→W | `ConfigurePayload` | Apply locale/theme/fontScale at runtime. Web SHOULD ack. Locale switch MUST also flip document direction (`dir=rtl` for `ar`). |
 | `formSubmitted` | W→N | `FormSubmittedPayload` | Emitted on successful submission of the embedded form. Native forwards to host; native MUST NOT auto-close (host decides). |
-| `formCancelled` | W→N | — | User exited without submitting (in-form close/finish affordance). |
+| `formCancelled` | W→N | — | User exited without submitting (in-form close/finish affordance, or the in-page back button of §4.2). |
 | `navigate` | W→N | `NavigatePayload` | Informational; fired on every router navigation within `/embed/*`. |
 | `openExternal` | W→N | `OpenExternalPayload` | Host SHOULD open in system browser / SFSafariViewController / Custom Tabs unless it intercepts. |
 | `downloadRequest` | W→N | `DownloadRequestPayload` | Native downloads (attaching `headers`) and presents a native preview (QuickLook / ACTION_VIEW). Native MUST NOT log the header values. |
@@ -155,6 +155,25 @@ pre-entrance checks the portal must not know about).
   the portal run its embedded auth-expired flow (`authExpired` → host `auth`).
 - Timeout or missing reply ⇒ the portal surfaces a generic load/submit error;
   it MUST NOT fall back to its own HTTP endpoints while delegation is active.
+
+### 4.2 In-page back (`init.inPageBack`)
+
+Additive protocol-v1 capability for hosts that draw NO navigation chrome around the
+WebView, so that the form gets the whole viewport.
+
+- The host opts in by sending `inPageBack: true` in `init`. Absent/false ⇒ the
+  portal renders no back affordance, because the host’s own header carries one.
+- When active, the portal MUST render a back control inside the form’s own header
+  and MUST emit `formCancelled` when it is pressed. No new message type: the
+  meaning is identical to an in-form close, so a host that handles one handles both.
+- It leaves the SCREEN. It MUST NOT step backwards through a multi-step form — that
+  stays the form’s own Prev control and `backPressed` (§4).
+- The host MUST hide its navigation chrome in the same change. Nothing in the
+  protocol can detect a disagreement, and the failure mode is two header bars or none.
+- Safe-area: with the chrome hidden the host MUST supply the top inset itself. The
+  portal applies `env(safe-area-inset-top)`, which an Android WebView reports as 0;
+  padding on the native side cannot double up, because it moves the WebView out of
+  the unsafe area and drives the portal’s own `env()` to 0 as well.
 
 ## 5. Version handshake (manifest)
 

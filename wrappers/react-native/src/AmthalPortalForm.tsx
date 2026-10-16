@@ -145,6 +145,15 @@ export interface AmthalPortalFormProps {
    * and the platform default applies.
    */
   onCloseRequested?: () => void;
+  /**
+   * This screen draws no native header, so the form must render its own back button.
+   *
+   * Set it together with `<Stack.Screen options={{ headerShown: false }} />` (or the equivalent
+   * for your navigator): the two have to agree, because the SDK cannot see your navigation
+   * chrome. Pressing the in-page button fires `onCancelled`, exactly as an in-form close does —
+   * nothing new to handle. It leaves the screen; it does not step back through the form.
+   */
+  inPageBack?: boolean;
 
   style?: StyleProp<ViewStyle>;
   /** Custom loading UI (shown until `ready`). */
@@ -546,6 +555,8 @@ export const AmthalPortalForm = forwardRef<AmthalPortalFormHandle, AmthalPortalF
             ...(auth ? { auth } : {}),
             // SPEC §4.1: host owns the form data plane when a handler is set.
             formDelegation: !!propsRef.current.onFormOp,
+            // The host hid its own header, so the portal owns the back affordance.
+            inPageBack: !!propsRef.current.inPageBack,
           },
           envelope.id,
         );
